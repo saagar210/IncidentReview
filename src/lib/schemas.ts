@@ -216,6 +216,30 @@ export const BuildChunksResultSchema = z.object({
   updated_at: z.string(),
 });
 
+export const CitationLocatorSchema = z.object({
+  source_id: z.string(),
+  ordinal: z.number().int().nonnegative(),
+  text_sha256: z.string(),
+  char_range: z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()]).nullable().optional(),
+});
+
+export const CitationSchema = z.object({
+  chunk_id: z.string(),
+  locator: CitationLocatorSchema,
+});
+
+export const EvidenceQueryHitSchema = z.object({
+  chunk_id: z.string(),
+  source_id: z.string(),
+  score: z.number(),
+  snippet: z.string(),
+  citation: CitationSchema,
+});
+
+export const EvidenceQueryResponseSchema = z.object({
+  hits: z.array(EvidenceQueryHitSchema),
+});
+
 export const AiIndexStatusSchema = z.object({
   ready: z.boolean(),
   model: z.string().nullable().optional(),

@@ -11,6 +11,7 @@ use qir_ai::evidence::{
     AiIndexBuildInput as AiIndexBuildInput, AiIndexStatus as AiIndexStatus, IndexStore as AiIndexStore,
 };
 use qir_ai::embeddings::ollama_embed::OllamaEmbedder;
+use qir_ai::retrieve::{query_with_embedder as ai_query_with_embedder, EvidenceQueryResponse as AiEvidenceQueryResponse};
 use qir_core::analytics::{DashboardPayloadV1, DashboardPayloadV2};
 use qir_core::backup::{BackupCreateResult, BackupManifest, RestoreResult};
 use qir_core::demo::seed_demo_dataset as core_seed_demo_dataset;
@@ -66,6 +67,14 @@ pub struct EvidenceAddSourceRequest {
 pub struct AiIndexBuildRequest {
     pub model: String,
     pub source_id: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiEvidenceQueryRequest {
+    pub query: String,
+    pub top_k: u32,
+    pub source_filter: Option<Vec<String>>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -557,6 +566,25 @@ fn ai_index_build(app: tauri::AppHandle, req: AiIndexBuildRequest) -> Result<AiI
 }
 
 #[tauri::command]
+fn ai_evidence_query(
+    app: tauri::AppHandle,
+    req: AiEvidenceQueryRequest,
+) -> Result<AiEvidenceQueryResponse, AppError> {
+    let root = ai_store_root(&app)?;
+    let evidence = AiEvidenceStore::open(root.clone());
+    let index = AiIndexStore::open(root);
+    let embedder = ai_embedder()?;
+    ai_query_with_embedder(
+        &evidence,
+        &index,
+        &embedder,
+        &req.query,
+        req.top_k,
+        req.source_filter.as_deref(),
+    )
+}
+
+#[tauri::command]
 fn backup_create(app: tauri::AppHandle, destination_dir: String) -> Result<BackupCreateResult, AppError> {
     let state = app.state::<WorkspaceState>();
     let db_path = resolve_current_db_path(&app, &state)?;
@@ -690,6 +718,7 @@ pub fn run() {
             ai_evidence_list_chunks,
             ai_index_status,
             ai_index_build,
+            ai_evidence_query,
             backup_create,
             backup_inspect,
             restore_from_backup,

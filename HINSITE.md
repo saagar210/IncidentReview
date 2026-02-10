@@ -1711,3 +1711,44 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 
 6) Next steps
 - Implement retrieval API and Tauri/UI wiring for top-k evidence hits with stable ordering and citation objects.
+
+---
+
+## 2026-02-10 - Phase 5 DS3: Retrieval API (top-k evidence hits + citations)
+
+1) Done: what changed + why
+- Implemented a retrieval API in `crates/qir_ai`:
+  - embeds the query (via the configured index model)
+  - computes cosine similarity against stored index vectors
+  - returns stable top-k hits ordered by `score desc` then `chunk_id asc`
+  - includes deterministic snippets and fully-specified `Citation` objects (chunk_id + locator).
+- Added thin Tauri command `ai_evidence_query` and extended the AI UI section with a Search card and citation selection checkboxes.
+- Added unit tests for retrieval ordering (including deterministic tie-break behavior) using a mock embedder.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/retrieve/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/retrieve/similarity.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/lib.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/tests/retrieval.rs
+- /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs
+- /Users/d/Projects/IncidentReview/src/lib/schemas.ts
+- /Users/d/Projects/IncidentReview/src/features/ai/AiSection.tsx
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Retrieval currently loads chunk text per returned hit to build snippets; this is fine for demo-scale data but may need caching if very large evidence stores are used.
+
+5) Status: current phase + complete / in progress / blocked
+- Phase 5 DS3: complete (retrieval + citations).
+- Phase 5 DS4: next (drafting with mandatory citations; hard fail on missing/invalid citations).
+
+6) Next steps
+- Add drafting endpoint (exec_summary only) that requires explicit citations and server-side citation validation (no silent fallbacks).

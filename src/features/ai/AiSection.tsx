@@ -4,6 +4,7 @@ import { invokeValidated, extractAppError } from "../../lib/tauri";
 import {
   AiIndexStatusSchema,
   BuildChunksResultSchema,
+  EvidenceQueryResponseSchema,
   EvidenceChunkSummaryListSchema,
   EvidenceSourceListSchema,
 } from "../../lib/schemas";
@@ -45,6 +46,18 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
     chunk_count: number;
     updated_at?: string | null;
   }>(null);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [searchTopK, setSearchTopK] = useState<number>(8);
+  const [searchHits, setSearchHits] = useState<
+    Array<{
+      chunk_id: string;
+      source_id: string;
+      score: number;
+      snippet: string;
+      citation: { chunk_id: string; locator: { source_id: string; ordinal: number; text_sha256: string; char_range?: [number, number] | null } };
+    }>
+  >([]);
+  const [selectedCitationChunkIds, setSelectedCitationChunkIds] = useState<string[]>([]);
 
   const originKind = useMemo(() => defaultOriginKindForType(addType), [addType]);
 
@@ -179,6 +192,31 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
       props.onToast({
         kind: "error",
         title: "Build index failed",
+        message: appErr ? `${appErr.code}: ${appErr.message}` : String(e),
+      });
+    }
+  }
+
+  async function onSearchEvidence() {
+    try {
+      const res = await invokeValidated(
+        "ai_evidence_query",
+        {
+          req: {
+            query: searchQuery,
+            topK: Math.max(1, Math.min(50, searchTopK | 0)),
+            sourceFilter: selectedSourceId ? [selectedSourceId] : null,
+          },
+        },
+        EvidenceQueryResponseSchema
+      );
+      setSearchHits(res.hits);
+      props.onToast({ kind: "success", title: "Search complete", message: `${res.hits.length} hits` });
+    } catch (e) {
+      const appErr = extractAppError(e);
+      props.onToast({
+        kind: "error",
+        title: "Search failed",
         message: appErr ? `${appErr.code}: ${appErr.message}` : String(e),
       });
     }
@@ -334,6 +372,67 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
           </p>
         ) : (
           <p className="hint">Status not loaded.</p>
+        )}
+      </div>
+
+      <div className="card card--sub">
+        <h3>Search Evidence (Top-K)</h3>
+        <p className="hint">
+          Retrieval uses the local index. Ordering is stable: score desc, then chunk_id asc. Select chunks here to use as
+          citations for drafting in DS4.
+        </p>
+        <div className="grid">
+          <label>
+            Query
+            <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search query" />
+          </label>
+          <label>
+            top_k
+            <input
+              type="number"
+              value={searchTopK}
+              onChange={(e) => setSearchTopK(parseInt(e.target.value || "8", 10))}
+              min={1}
+              max={50}
+            />
+          </label>
+        </div>
+        <div className="actions">
+          <button className="btn btn--accent" type="button" onClick={onSearchEvidence} disabled={!selectedSourceId}>
+            Search (selected source)
+          </button>
+        </div>
+        {searchHits.length === 0 ? (
+          <p className="hint">No hits.</p>
+        ) : (
+          <ul className="list">
+            {searchHits.map((h) => {
+              const checked = selectedCitationChunkIds.includes(h.chunk_id);
+              return (
+                <li key={h.chunk_id}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => {
+                        const next = e.target.checked
+                          ? Array.from(new Set([...selectedCitationChunkIds, h.chunk_id]))
+                          : selectedCitationChunkIds.filter((id) => id !== h.chunk_id);
+                        setSelectedCitationChunkIds(next);
+                      }}
+                    />{" "}
+                    <code>{h.chunk_id}</code> <span className="pill pill--small">score {h.score.toFixed(4)}</span>
+                  </label>
+                  <div className="hint">{h.snippet}</div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {selectedCitationChunkIds.length > 0 ? (
+          <p className="hint">Selected citations: {selectedCitationChunkIds.join(", ")}</p>
+        ) : (
+          <p className="hint">Selected citations: none</p>
         )}
       </div>
     </section>

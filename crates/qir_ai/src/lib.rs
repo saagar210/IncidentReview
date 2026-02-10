@@ -2,6 +2,7 @@ pub mod evidence;
 pub mod embeddings;
 pub mod guardrails;
 pub mod ollama;
+pub mod retrieve;
 
 #[cfg(test)]
 mod tests {
