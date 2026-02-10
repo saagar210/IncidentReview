@@ -1235,3 +1235,35 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 
 6) Next steps
 - Update `PLANS.md` to record DS5.1 contract-hardening work, and add DS5.1 completion entry after final verification + final repo hygiene checks.
+
+---
+
+## 2026-02-10 - DS5.1 completion: error contract hardening + Phase 5 preflight guardrails (tests only)
+
+1) Done: what changed + why
+- Completed DS5.1:
+  - Sanitized import UI error handling now branches exclusively on stable `AppError.code` (no substring matching).
+  - Invoke wrapper preserves structured `AppError` objects to callers (typed exception includes `code/details/retryable`).
+  - Added deterministic Rust tests asserting import/export error codes and frontend tests asserting code-based branching.
+  - Added Phase 5 preflight guardrails in `qir_ai` (strict `http://127.0.0.1[:port]` enforcement + boundary/placeholder tests) without expanding AI features.
+- Updated `PLANS.md` to mark DS5.1 complete.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- None for DS5.1 scope. Phase 5 remains gated; keep AI scope limited to guardrails until foundations are explicitly opened.
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 5.1: complete.
+
+6) Next steps
+- Continue Phase 4 polish (endpoint coverage/UX) without relaxing determinism, privacy, or module boundaries.
