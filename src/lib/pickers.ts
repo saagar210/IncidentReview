@@ -18,3 +18,13 @@ export async function pickDbFile(): Promise<string | null> {
   return res;
 }
 
+export async function pickTextFile(): Promise<string | null> {
+  const res = await open({
+    directory: false,
+    multiple: false,
+    filters: [{ name: "Text", extensions: ["txt", "md", "json"] }],
+  });
+  if (!res) return null;
+  if (Array.isArray(res)) return res[0] ?? null;
+  return res;
+}

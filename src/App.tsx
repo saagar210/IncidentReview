@@ -40,6 +40,7 @@ import { ValidationSection } from "./features/validation/ValidationSection";
 import { ReportSection } from "./features/report/ReportSection";
 import { DashboardsSection } from "./features/dashboards/DashboardsSection";
 import { IncidentDetailDrawer } from "./features/dashboards/IncidentDetailDrawer";
+import { AiSection } from "./features/ai/AiSection";
 
 export default function App() {
   const { toasts, pushToast, dismissToast } = useToasts();
@@ -559,6 +560,7 @@ export default function App() {
       { label: "Dashboards", href: "#dashboards", kind: "accent" as const },
       { label: "Backup/Restore", href: "#data" },
       { label: "Report", href: "#report" },
+      { label: "AI (Phase 5)", href: "#ai" },
     ],
     []
   );
@@ -1081,6 +1083,12 @@ export default function App() {
       />
 
       <ReportSection reportMd={reportMd} />
+
+      <AiSection
+        onToast={(t) => {
+          pushToast({ kind: t.kind, title: t.title, message: t.message });
+        }}
+      />
     </main>
   );
 }

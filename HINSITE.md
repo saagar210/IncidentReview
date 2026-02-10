@@ -1625,3 +1625,46 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 
 6) Next steps
 - Use the Phase 5 prompt in this thread to get a crisp milestone plan/spec, then implement Phase 5 in small, verification-logged change-sets.
+
+---
+
+## 2026-02-10 - Phase 5 DS1: Evidence model + deterministic chunking (no embeddings)
+
+1) Done: what changed + why
+- Implemented a local-only evidence store in `crates/qir_ai` with canonical `EvidenceSource` and deterministic `EvidenceChunk` IDs as specified for Phase 5.
+- Added deterministic chunking for:
+  - `freeform_text` / `slack_transcript` / `incident_report_md`: paragraph-based chunking with stable ordinals
+  - `sanitized_export` directories: parses `incidents.json`, `timeline_events.json`, `warnings.json` and creates one stable per-incident bundle chunk (includes deterministic metrics as evidence, but does not compute metrics)
+- Added thin Tauri commands to add/list sources and build/list chunks, and a minimal UI section to exercise the evidence lifecycle.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/evidence/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/evidence/model.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/evidence/store.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/evidence/chunking.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/lib.rs
+- /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs
+- /Users/d/Projects/IncidentReview/src/lib/schemas.ts
+- /Users/d/Projects/IncidentReview/src/lib/pickers.ts
+- /Users/d/Projects/IncidentReview/src/features/ai/AiSection.tsx
+- /Users/d/Projects/IncidentReview/src/features/ai/AiSection.test.tsx
+- /Users/d/Projects/IncidentReview/src/App.tsx
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Evidence storage is file-based JSON for simplicity (no new dependencies); Phase 5 DS2 will add an index layer for embeddings/vectors.
+
+5) Status: current phase + complete / in progress / blocked
+- Phase 5 DS1: complete (evidence + chunking only).
+- Phase 5 DS2: next (local embeddings + index build/update).
+
+6) Next steps
+- Implement embeddings abstraction + index build/update flow in `crates/qir_ai` (unit tests must not require a running Ollama instance).

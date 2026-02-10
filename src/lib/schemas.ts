@@ -166,6 +166,56 @@ export const AiHealthStatusSchema = z.object({
   message: z.string(),
 });
 
+export const EvidenceSourceTypeSchema = z.enum([
+  "sanitized_export",
+  "slack_transcript",
+  "incident_report_md",
+  "freeform_text",
+]);
+
+export const EvidenceOriginSchema = z.object({
+  kind: z.string(),
+  path: z.string().nullable().optional(),
+});
+
+export const EvidenceSourceSchema = z.object({
+  source_id: z.string(),
+  type: EvidenceSourceTypeSchema,
+  origin: EvidenceOriginSchema,
+  label: z.string(),
+  created_at: z.string(),
+});
+
+export const EvidenceSourceListSchema = z.array(EvidenceSourceSchema);
+
+export const EvidenceTimeRangeSchema = z.object({
+  start_ts: z.string().nullable().optional(),
+  end_ts: z.string().nullable().optional(),
+});
+
+export const EvidenceChunkMetaSchema = z.object({
+  kind: z.string(),
+  incident_keys: z.array(z.string()).nullable().optional(),
+  time_range: EvidenceTimeRangeSchema.nullable().optional(),
+});
+
+export const EvidenceChunkSummarySchema = z.object({
+  chunk_id: z.string(),
+  source_id: z.string(),
+  ordinal: z.number().int().nonnegative(),
+  text_sha256: z.string(),
+  token_count_est: z.number().int().nonnegative(),
+  meta: EvidenceChunkMetaSchema,
+});
+
+export const EvidenceChunkSummaryListSchema = z.array(EvidenceChunkSummarySchema);
+
+export const BuildChunksResultSchema = z.object({
+  source_id: z.string().nullable().optional(),
+  chunk_count: z.number().int().nonnegative(),
+  updated_at: z.string(),
+});
+
 export const DeleteResponseSchema = z.object({
   ok: z.boolean(),
 });

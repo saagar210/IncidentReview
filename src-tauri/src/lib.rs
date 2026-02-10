@@ -3,6 +3,12 @@ use std::sync::Mutex;
 use std::path::PathBuf;
 
 use qir_ai::ollama::OllamaClient;
+use qir_ai::evidence::{
+    BuildChunksResult as AiBuildChunksResult, EvidenceAddSourceInput as AiEvidenceAddSourceInput,
+    EvidenceChunkSummary as AiEvidenceChunkSummary, EvidenceOrigin as AiEvidenceOrigin,
+    EvidenceQueryStore as AiEvidenceQueryStore, EvidenceSource as AiEvidenceSource,
+    EvidenceSourceType as AiEvidenceSourceType, EvidenceStore as AiEvidenceStore,
+};
 use qir_core::analytics::{DashboardPayloadV1, DashboardPayloadV2};
 use qir_core::backup::{BackupCreateResult, BackupManifest, RestoreResult};
 use qir_core::demo::seed_demo_dataset as core_seed_demo_dataset;
@@ -31,6 +37,7 @@ use time::OffsetDateTime;
 const WORKSPACE_CONFIG_FILE: &str = "workspace.json";
 const WORKSPACE_DEFAULT_DB_FILENAME: &str = "incidentreview.sqlite";
 const WORKSPACE_RECENT_LIMIT: usize = 8;
+const AI_STORE_DIRNAME: &str = "ai";
 
 #[derive(Debug, serde::Serialize)]
 pub struct InitDbResponse {
@@ -41,6 +48,15 @@ pub struct InitDbResponse {
 pub struct AiHealthStatus {
     pub ok: bool,
     pub message: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct EvidenceAddSourceRequest {
+    #[serde(rename = "type")]
+    pub source_type: AiEvidenceSourceType,
+    pub origin: AiEvidenceOrigin,
+    pub label: String,
+    pub text: Option<String>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -158,6 +174,19 @@ fn default_artifacts_dir(app: &tauri::AppHandle) -> Result<PathBuf, AppError> {
             .with_details(e.to_string())
     })?;
     Ok(dir.join("artifacts"))
+}
+
+fn ai_store_root(app: &tauri::AppHandle) -> Result<PathBuf, AppError> {
+    let dir = app.path().app_data_dir().map_err(|e| {
+        AppError::new("AI_EVIDENCE_STORE_FAILED", "Failed to resolve app data directory")
+            .with_details(e.to_string())
+    })?;
+    let root = dir.join(AI_STORE_DIRNAME);
+    fs::create_dir_all(&root).map_err(|e| {
+        AppError::new("AI_EVIDENCE_STORE_FAILED", "Failed to create AI store directory")
+            .with_details(format!("path={}; err={}", root.display(), e))
+    })?;
+    Ok(root)
 }
 
 fn now_rfc3339_utc() -> Result<String, AppError> {
@@ -441,6 +470,54 @@ fn ai_health_check() -> Result<AiHealthStatus, AppError> {
 }
 
 #[tauri::command]
+fn ai_evidence_add_source(
+    app: tauri::AppHandle,
+    req: EvidenceAddSourceRequest,
+) -> Result<AiEvidenceSource, AppError> {
+    let root = ai_store_root(&app)?;
+    let store = AiEvidenceStore::open(root);
+    let created_at = now_rfc3339_utc()?;
+    store.add_source(AiEvidenceAddSourceInput {
+        source_type: req.source_type,
+        origin: req.origin,
+        label: req.label,
+        created_at,
+        text: req.text,
+    })
+}
+
+#[tauri::command]
+fn ai_evidence_list_sources(app: tauri::AppHandle) -> Result<Vec<AiEvidenceSource>, AppError> {
+    let root = ai_store_root(&app)?;
+    let store = AiEvidenceStore::open(root);
+    store.list_sources()
+}
+
+#[tauri::command]
+fn ai_evidence_build_chunks(
+    app: tauri::AppHandle,
+    source_id: Option<String>,
+) -> Result<AiBuildChunksResult, AppError> {
+    let root = ai_store_root(&app)?;
+    let store = AiEvidenceStore::open(root);
+    let updated_at = now_rfc3339_utc()?;
+    store.build_chunks(source_id, &updated_at)
+}
+
+#[tauri::command]
+fn ai_evidence_list_chunks(
+    app: tauri::AppHandle,
+    source_id: Option<String>,
+) -> Result<Vec<AiEvidenceChunkSummary>, AppError> {
+    let root = ai_store_root(&app)?;
+    let store = AiEvidenceStore::open(root);
+    store.list_chunks(AiEvidenceQueryStore {
+        include_text: false,
+        source_id,
+    })
+}
+
+#[tauri::command]
 fn backup_create(app: tauri::AppHandle, destination_dir: String) -> Result<BackupCreateResult, AppError> {
     let state = app.state::<WorkspaceState>();
     let db_path = resolve_current_db_path(&app, &state)?;
@@ -567,8 +644,11 @@ pub fn run() {
             validation_report,
             slack_preview,
             slack_ingest,
-            ai_health_check
-            ,
+            ai_health_check,
+            ai_evidence_add_source,
+            ai_evidence_list_sources,
+            ai_evidence_build_chunks,
+            ai_evidence_list_chunks,
             backup_create,
             backup_inspect,
             restore_from_backup,

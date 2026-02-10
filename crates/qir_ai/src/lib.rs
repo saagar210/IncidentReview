@@ -34,12 +34,32 @@ mod tests {
             "incidentreview-evidence-test-{}",
             std::process::id()
         ));
-        let store = EvidenceStore::new(root);
-        let chunk = store
-            .put_chunk("slack_sample.txt", "hello world")
-            .expect("put");
-        let got = store.get_chunk(&chunk.id).expect("get");
-        assert_eq!(chunk, got);
+        let store = EvidenceStore::open(root);
+        let source = store
+            .add_source(super::evidence::EvidenceAddSourceInput {
+                source_type: super::evidence::EvidenceSourceType::FreeformText,
+                origin: super::evidence::EvidenceOrigin {
+                    kind: "paste".to_string(),
+                    path: None,
+                },
+                label: "test".to_string(),
+                created_at: "2026-02-10T00:00:00Z".to_string(),
+                text: Some("hello world".to_string()),
+            })
+            .expect("add_source");
+        store
+            .build_chunks(Some(source.source_id.clone()), "2026-02-10T00:00:00Z")
+            .expect("build_chunks");
+        let chunks = store
+            .list_chunks(super::evidence::EvidenceQueryStore {
+                include_text: false,
+                source_id: Some(source.source_id.clone()),
+            })
+            .expect("list");
+        assert_eq!(chunks.len(), 1);
+        let chunk = store.get_chunk(&chunks[0].chunk_id).expect("get");
+        assert_eq!(chunk.source_id, source.source_id);
+        assert!(chunk.text.contains("hello world"));
     }
 
     #[test]
