@@ -26,10 +26,11 @@ impl Embedder for CountABEmbedder {
 
 #[test]
 fn retrieval_returns_stable_topk_and_tie_breaks_by_chunk_id() {
-    let root = PathBuf::from(std::env::temp_dir()).join(format!(
-        "incidentreview-ai-retrieval-test-{}",
-        std::process::id()
-    ));
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let root = PathBuf::from(std::env::temp_dir()).join(format!("incidentreview-ai-retrieval-test-{nanos}"));
     let evidence = EvidenceStore::open(root.clone());
 
     let para_a = "a".repeat(1000);
@@ -92,4 +93,3 @@ fn retrieval_returns_stable_topk_and_tie_breaks_by_chunk_id() {
     assert_eq!(tie.hits.len(), 2);
     assert!(tie.hits[0].chunk_id < tie.hits[1].chunk_id);
 }
-

@@ -1752,3 +1752,49 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 
 6) Next steps
 - Add drafting endpoint (exec_summary only) that requires explicit citations and server-side citation validation (no silent fallbacks).
+
+---
+
+## 2026-02-10 - Phase 5 DS4: Drafting with mandatory citations (exec_summary)
+
+1) Done: what changed + why
+- Implemented Phase 5 drafting in `crates/qir_ai` (exec_summary only) with hard guardrails:
+  - Request must include `citation_chunk_ids` (else `AI_CITATION_REQUIRED`).
+  - Citation chunk IDs must exist (else `AI_CITATION_INVALID`).
+  - Output must contain citation markers `[[chunk:<chunk_id>]]` (else `AI_CITATION_REQUIRED`).
+  - Output may only cite the approved chunk IDs (else `AI_CITATION_INVALID`).
+- Added an LLM abstraction with an Ollama-backed implementation (`/api/generate`, localhost-only via `OllamaClient`).
+- Added thin Tauri command `ai_draft_section` and extended the AI UI section with an Exec Summary draft flow gated on citation selection.
+- Added unit tests for the citation enforcement rules using a mock LLM (no runtime Ollama dependency in test suite).
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/draft/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/draft/prompts.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/llm/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/llm/ollama_llm.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/lib.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/tests/draft.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/tests/index_build.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/tests/retrieval.rs
+- /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs
+- /Users/d/Projects/IncidentReview/src/lib/schemas.ts
+- /Users/d/Projects/IncidentReview/src/features/ai/AiSection.tsx
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Drafting uses a fixed default Ollama model name (`llama3`). If not installed, drafting will fail with `AI_DRAFT_FAILED`; DS5 UI gating should surface guidance to install/pull a local model.
+
+5) Status: current phase + complete / in progress / blocked
+- Phase 5 DS4: complete (drafting with citations).
+- Phase 5 DS5: next (UI gating + AI Draft screen polish; end-to-end UX gates by health/evidence/chunks/index).
+
+6) Next steps
+- Implement explicit UI gating states (health/evidence/chunks/index) and a more intentional “AI Draft” screen experience, without adding new Tauri commands.

@@ -240,6 +240,14 @@ export const EvidenceQueryResponseSchema = z.object({
   hits: z.array(EvidenceQueryHitSchema),
 });
 
+export const AiSectionIdSchema = z.enum(["exec_summary"]);
+
+export const AiDraftResponseSchema = z.object({
+  section_id: AiSectionIdSchema,
+  markdown: z.string(),
+  citations: z.array(CitationSchema),
+});
+
 export const AiIndexStatusSchema = z.object({
   ready: z.boolean(),
   model: z.string().nullable().optional(),

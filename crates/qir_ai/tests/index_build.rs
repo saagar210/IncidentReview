@@ -19,10 +19,11 @@ impl Embedder for MockEmbedder {
 
 #[test]
 fn builds_index_from_existing_chunks_with_mock_embedder() {
-    let root = PathBuf::from(std::env::temp_dir()).join(format!(
-        "incidentreview-ai-index-test-{}",
-        std::process::id()
-    ));
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let root = PathBuf::from(std::env::temp_dir()).join(format!("incidentreview-ai-index-test-{nanos}"));
     let evidence = EvidenceStore::open(root.clone());
     let source = evidence
         .add_source(EvidenceAddSourceInput {
@@ -58,4 +59,3 @@ fn builds_index_from_existing_chunks_with_mock_embedder() {
     assert_eq!(st.model.as_deref(), Some("mock"));
     assert_eq!(st.dims, Some(3));
 }
-

@@ -1,6 +1,8 @@
 pub mod evidence;
 pub mod embeddings;
+pub mod draft;
 pub mod guardrails;
+pub mod llm;
 pub mod ollama;
 pub mod retrieve;
 
@@ -32,10 +34,11 @@ mod tests {
 
     #[test]
     fn evidence_store_roundtrip() {
-        let root = PathBuf::from(std::env::temp_dir()).join(format!(
-            "incidentreview-evidence-test-{}",
-            std::process::id()
-        ));
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = PathBuf::from(std::env::temp_dir()).join(format!("incidentreview-evidence-test-{nanos}"));
         let store = EvidenceStore::open(root);
         let source = store
             .add_source(super::evidence::EvidenceAddSourceInput {

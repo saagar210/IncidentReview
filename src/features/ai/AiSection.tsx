@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { invokeValidated, extractAppError } from "../../lib/tauri";
 import {
+  AiDraftResponseSchema,
   AiIndexStatusSchema,
   BuildChunksResultSchema,
   EvidenceQueryResponseSchema,
@@ -58,6 +59,12 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
     }>
   >([]);
   const [selectedCitationChunkIds, setSelectedCitationChunkIds] = useState<string[]>([]);
+  const [draftQuarterLabel, setDraftQuarterLabel] = useState<string>("Q1 2026");
+  const [draftPrompt, setDraftPrompt] = useState<string>("Draft an executive summary based on the evidence.");
+  const [draftMarkdown, setDraftMarkdown] = useState<string>("");
+  const [draftCitations, setDraftCitations] = useState<
+    Array<{ chunk_id: string; locator: { source_id: string; ordinal: number; text_sha256: string; char_range?: [number, number] | null } }>
+  >([]);
 
   const originKind = useMemo(() => defaultOriginKindForType(addType), [addType]);
 
@@ -231,6 +238,33 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
       props.onToast({
         kind: "error",
         title: "List chunks failed",
+        message: appErr ? `${appErr.code}: ${appErr.message}` : String(e),
+      });
+    }
+  }
+
+  async function onDraftExecSummary() {
+    try {
+      const res = await invokeValidated(
+        "ai_draft_section",
+        {
+          req: {
+            sectionId: "exec_summary",
+            quarterLabel: draftQuarterLabel,
+            prompt: draftPrompt,
+            citationChunkIds: selectedCitationChunkIds,
+          },
+        },
+        AiDraftResponseSchema
+      );
+      setDraftMarkdown(res.markdown);
+      setDraftCitations(res.citations);
+      props.onToast({ kind: "success", title: "Draft complete", message: `citations=${res.citations.length}` });
+    } catch (e) {
+      const appErr = extractAppError(e);
+      props.onToast({
+        kind: "error",
+        title: "Draft failed",
         message: appErr ? `${appErr.code}: ${appErr.message}` : String(e),
       });
     }
@@ -433,6 +467,54 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
           <p className="hint">Selected citations: {selectedCitationChunkIds.join(", ")}</p>
         ) : (
           <p className="hint">Selected citations: none</p>
+        )}
+      </div>
+
+      <div className="card card--sub">
+        <h3>Draft (Exec Summary)</h3>
+        <p className="hint">
+          Drafting is local-only via Ollama. Draft requests must include at least one selected citation chunk; the server
+          hard-fails with <code>AI_CITATION_REQUIRED</code> if missing.
+        </p>
+        <div className="grid">
+          <label>
+            Quarter label
+            <input value={draftQuarterLabel} onChange={(e) => setDraftQuarterLabel(e.target.value)} />
+          </label>
+        </div>
+        <label>
+          Prompt
+          <textarea rows={4} value={draftPrompt} onChange={(e) => setDraftPrompt(e.target.value)} />
+        </label>
+        <div className="actions">
+          <button
+            className="btn btn--accent"
+            type="button"
+            onClick={onDraftExecSummary}
+            disabled={selectedCitationChunkIds.length === 0}
+          >
+            Draft Exec Summary (requires citations)
+          </button>
+        </div>
+        {draftMarkdown ? (
+          <>
+            <h4>Draft Markdown</h4>
+            <pre className="code">{draftMarkdown}</pre>
+            <h4>Citations</h4>
+            {draftCitations.length === 0 ? (
+              <p className="hint">No citations returned (this should not happen; server enforces citations).</p>
+            ) : (
+              <ul className="list">
+                {draftCitations.map((c) => (
+                  <li key={c.chunk_id}>
+                    <code>{c.chunk_id}</code> (source_id={c.locator.source_id}; ordinal={c.locator.ordinal})
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        ) : (
+          <p className="hint">No draft yet.</p>
         )}
       </div>
     </section>

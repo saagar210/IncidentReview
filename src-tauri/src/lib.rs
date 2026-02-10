@@ -11,7 +11,9 @@ use qir_ai::evidence::{
     AiIndexBuildInput as AiIndexBuildInput, AiIndexStatus as AiIndexStatus, IndexStore as AiIndexStore,
 };
 use qir_ai::embeddings::ollama_embed::OllamaEmbedder;
+use qir_ai::llm::ollama_llm::OllamaLlm;
 use qir_ai::retrieve::{query_with_embedder as ai_query_with_embedder, EvidenceQueryResponse as AiEvidenceQueryResponse};
+use qir_ai::draft::{draft_section_with_llm as ai_draft_with_llm, AiDraftResponse as AiDraftResponse, AiDraftSectionRequest as AiDraftSectionRequest, SectionId as AiSectionId};
 use qir_core::analytics::{DashboardPayloadV1, DashboardPayloadV2};
 use qir_core::backup::{BackupCreateResult, BackupManifest, RestoreResult};
 use qir_core::demo::seed_demo_dataset as core_seed_demo_dataset;
@@ -75,6 +77,15 @@ pub struct AiEvidenceQueryRequest {
     pub query: String,
     pub top_k: u32,
     pub source_filter: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiDraftSectionRequestWire {
+    pub section_id: AiSectionId,
+    pub quarter_label: String,
+    pub prompt: String,
+    pub citation_chunk_ids: Vec<String>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -210,6 +221,11 @@ fn ai_store_root(app: &tauri::AppHandle) -> Result<PathBuf, AppError> {
 fn ai_embedder() -> Result<OllamaEmbedder, AppError> {
     let client = OllamaClient::new("http://127.0.0.1:11434")?;
     Ok(OllamaEmbedder::new(client))
+}
+
+fn ai_llm() -> Result<OllamaLlm, AppError> {
+    let client = OllamaClient::new("http://127.0.0.1:11434")?;
+    Ok(OllamaLlm::new(client))
 }
 
 fn now_rfc3339_utc() -> Result<String, AppError> {
@@ -585,6 +601,32 @@ fn ai_evidence_query(
 }
 
 #[tauri::command]
+fn ai_draft_section(
+    app: tauri::AppHandle,
+    req: AiDraftSectionRequestWire,
+) -> Result<AiDraftResponse, AppError> {
+    let root = ai_store_root(&app)?;
+    let evidence = AiEvidenceStore::open(root);
+    let llm = ai_llm()?;
+
+    // Minimal shippable default. Users must have this model installed locally in Ollama.
+    // Future: surface installed models via a dedicated command and UI selector.
+    let model = "llama3";
+
+    ai_draft_with_llm(
+        &evidence,
+        &llm,
+        model,
+        AiDraftSectionRequest {
+            section_id: req.section_id,
+            quarter_label: req.quarter_label,
+            prompt: req.prompt,
+            citation_chunk_ids: req.citation_chunk_ids,
+        },
+    )
+}
+
+#[tauri::command]
 fn backup_create(app: tauri::AppHandle, destination_dir: String) -> Result<BackupCreateResult, AppError> {
     let state = app.state::<WorkspaceState>();
     let db_path = resolve_current_db_path(&app, &state)?;
@@ -719,6 +761,7 @@ pub fn run() {
             ai_index_status,
             ai_index_build,
             ai_evidence_query,
+            ai_draft_section,
             backup_create,
             backup_inspect,
             restore_from_backup,
