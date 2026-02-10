@@ -1,0 +1,4 @@
+Key,Summary,Description,Severity,ImpactPct,ServiceHealthPct,StartTs,AckTs,ResolveTs
+INC-201,"One","Sanitized description",SEV2,35,80,2026-01-05T12:00:00Z,2026-01-05T12:07:00Z,2026-01-05T12:40:00Z
+INC-201,"Two","Sanitized description",SEV2,35,80,2026-01-05T12:00:00Z,2026-01-05T12:07:00Z,2026-01-05T12:40:00Z
+

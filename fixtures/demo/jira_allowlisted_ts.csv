@@ -1,0 +1,3 @@
+Key,Summary,Description,Severity,ImpactPct,ServiceHealthPct,StartTs,AckTs,ResolveTs
+INC-302,"Allowlisted timestamp formats","Sanitized description",SEV2,5,99,"2026-02-01 00:00:00","2026-02-01 00:05","2026-02-01T00:10:00Z"
+

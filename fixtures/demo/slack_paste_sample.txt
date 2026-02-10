@@ -1,0 +1,3 @@
+alice: Sanitized paste transcript line one.
+bob: Sanitized paste transcript line two (no timestamps).
+

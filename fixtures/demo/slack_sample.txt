@@ -1,0 +1,4 @@
+2026-01-05T12:03:00Z - alice: Looking into elevated errors.
+2026-01-05T12:07:00Z - bob: Acked. Working mitigation.
+No timestamp here, should warn but still ingest as text.
+

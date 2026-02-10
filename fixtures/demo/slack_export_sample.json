@@ -1,0 +1,15 @@
+[
+  {
+    "type": "message",
+    "user": "U123",
+    "text": "Sanitized: investigating elevated error rates.",
+    "ts": "1700000000.000100"
+  },
+  {
+    "type": "message",
+    "user": "U234",
+    "text": "Sanitized: acked, working mitigation.",
+    "ts": "1700000060.000000"
+  }
+]
+

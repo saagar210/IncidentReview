@@ -1,0 +1,15 @@
+[package]
+name = "qir_ai"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+qir_core = { path = "../qir_core" }
+hex = "0.4.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10.9"
+ureq = { version = "2.12.1", features = ["json"] }
+
+[dev-dependencies]
+pretty_assertions = "1"

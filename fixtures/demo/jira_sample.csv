@@ -1,0 +1,4 @@
+Key,Summary,Description,Severity,ImpactPct,ServiceHealthPct,StartTs,AckTs,ResolveTs
+INC-101,"Payments degraded","Sanitized description",SEV2,35,80,2026-01-05T12:00:00Z,2026-01-05T12:07:00Z,2026-01-05T12:40:00Z
+INC-102,"Search outage","Sanitized description",SEV1,100,0,2026-01-18T03:10:00Z,2026-01-18T03:12:00Z,2026-01-18T04:02:00Z
+

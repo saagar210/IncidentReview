@@ -1,0 +1,806 @@
+# HINSITE
+
+Verification and audit log for meaningful change-sets in this repository.
+
+---
+
+## 2026-02-10 - Phase 0 scaffold (Tauri + React + Rust workspace)
+
+1) Done: what changed + why
+- Scaffolded the repo into the required structure (`src/`, `src-tauri/`, `crates/qir_core/`, `crates/qir_ai/`, `migrations/`, `fixtures/`) so we can iterate with deterministic verification gates.
+- Added canonical scripts so required verification commands exist and are repeatable.
+- Added minimal Rust crates (`qir_core`, `qir_ai`) and a minimal Tauri shell to ensure `pnpm tauri build` and `cargo test -p ...` work early.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/.gitignore
+- /Users/d/Projects/IncidentReview/package.json
+- /Users/d/Projects/IncidentReview/index.html
+- /Users/d/Projects/IncidentReview/tsconfig.json
+- /Users/d/Projects/IncidentReview/tsconfig.node.json
+- /Users/d/Projects/IncidentReview/vite.config.ts
+- /Users/d/Projects/IncidentReview/vitest.config.ts
+- /Users/d/Projects/IncidentReview/.eslintrc.cjs
+- /Users/d/Projects/IncidentReview/src/main.tsx
+- /Users/d/Projects/IncidentReview/src/App.tsx
+- /Users/d/Projects/IncidentReview/src/styles.css
+- /Users/d/Projects/IncidentReview/src/vite-env.d.ts
+- /Users/d/Projects/IncidentReview/src/smoke.test.ts
+- /Users/d/Projects/IncidentReview/Cargo.toml
+- /Users/d/Projects/IncidentReview/crates/qir_core/Cargo.toml
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/lib.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/error.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/Cargo.toml
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/lib.rs
+- /Users/d/Projects/IncidentReview/src-tauri/Cargo.toml
+- /Users/d/Projects/IncidentReview/src-tauri/build.rs
+- /Users/d/Projects/IncidentReview/src-tauri/tauri.conf.json
+- /Users/d/Projects/IncidentReview/src-tauri/src/main.rs
+- /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs
+- /Users/d/Projects/IncidentReview/src-tauri/icons/* (copied from the Tauri scaffold to satisfy bundling)
+- /Users/d/Projects/IncidentReview/public/* (copied from the Tauri scaffold)
+- /Users/d/Projects/IncidentReview/migrations/.gitkeep
+- /Users/d/Projects/IncidentReview/fixtures/.gitkeep
+- /Users/d/Projects/IncidentReview/.codex/setup.sh
+- /Users/d/Projects/IncidentReview/.codex/actions/lint.sh
+- /Users/d/Projects/IncidentReview/.codex/actions/test.sh
+- /Users/d/Projects/IncidentReview/.codex/actions/build.sh
+
+3) Verification: commands run + results
+- `pnpm install` (source: /Users/d/Projects/IncidentReview/README.md) -> OK
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (pnpm security feature) so Vite could build.
+
+4) Risks / follow-ups
+- `src-tauri/tauri.conf.json` currently sets `csp: null`. We should tighten CSP once we know needed allowances for local UI behavior.
+- The temporary `_scaffold/` directory exists locally but is ignored via /Users/d/Projects/IncidentReview/.gitignore due to exec-policy restrictions on `rm -rf`.
+
+5) Status: current phase + complete / in progress / blocked
+- Phase 0: complete.
+- Phase 1: next (schema/migrations, ingest, validators, deterministic metrics in `crates/qir_core`).
+
+6) Next steps
+- Implement SQLite schema + migration runner in /Users/d/Projects/IncidentReview/crates/qir_core and add the first migration under /Users/d/Projects/IncidentReview/migrations/.
+- Add deterministic ingest stubs (Jira CSV + Slack transcript) and validators with fixtures and tests.
+- Wire minimal Tauri commands for DB init and import (thin wrappers only).
+
+---
+
+## 2026-02-10 - Phase 1.1 DB schema + migration runner (qir_core)
+
+1) Done: what changed + why
+- Added the initial SQLite schema in /Users/d/Projects/IncidentReview/migrations/0001_init.sql with nullable canonical timestamps and uniqueness constraints for dedupe (external_id preferred, otherwise fingerprint).
+- Implemented a deterministic migration runner in /Users/d/Projects/IncidentReview/crates/qir_core/src/db/mod.rs that applies migrations exactly once and surfaces errors with explicit codes/messages (no silent failure).
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/migrations/0001_init.sql
+- /Users/d/Projects/IncidentReview/crates/qir_core/Cargo.toml
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/lib.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/db/mod.rs
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- `migrations/0001_init.sql` stores timestamps as TEXT; we should validate/normalize ingestion into a canonical ISO-8601 format and keep ordering checks in validators.
+- Schema will evolve; future migrations must preserve deterministic report ordering (stable sorts) and avoid destructive defaults.
+
+5) Status: current phase + complete / in progress / blocked
+- Phase 1: in progress (ingest + validators + metrics next).
+
+6) Next steps
+- Add domain types + deterministic fingerprinting in /Users/d/Projects/IncidentReview/crates/qir_core and implement ingesters (Jira CSV + Slack transcript).
+- Implement validators for timestamp ordering and percent field ranges with fixture-backed tests.
+
+---
+
+## 2026-02-10 - Phase 1.2 Jira CSV ingest (qir_core)
+
+1) Done: what changed + why
+- Added domain types for incidents and validation warnings in /Users/d/Projects/IncidentReview/crates/qir_core/src/domain/mod.rs.
+- Implemented Jira CSV ingest with explicit mapping in /Users/d/Projects/IncidentReview/crates/qir_core/src/ingest/jira_csv.rs:
+  - no silent defaults (missing titles become warnings and rows are skipped)
+  - percent fields validate 0..100 with warnings on failures
+  - deterministic fingerprinting to support dedupe rules
+- Added a sanitized CSV fixture and an integration test to ensure ingest works end-to-end against an in-memory migrated DB.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_core/Cargo.toml
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/lib.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/domain/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/ingest/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/ingest/jira_csv.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/ingest_jira_csv.rs
+- /Users/d/Projects/IncidentReview/fixtures/demo/jira_sample.csv
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Timestamp parsing/normalization is not implemented yet; ingest currently stores timestamp strings as-is and validators must flag ordering/format anomalies.
+- The current behavior returns an error on any DB insert failure (including uniqueness conflicts). We should enrich this to surface conflicts as structured ingest results instead of a single fatal error.
+
+5) Status: current phase + complete / in progress / blocked
+- Phase 1: in progress (Slack ingest + validators + deterministic metrics next).
+
+6) Next steps
+- Implement Slack transcript ingest in /Users/d/Projects/IncidentReview/crates/qir_core/src/ingest/.
+- Implement validators (timestamp ordering + percent ranges + dedupe conflict surfacing) and tests with sanitized fixtures.
+
+---
+
+## 2026-02-10 - Phase 1.3 Validators + deterministic per-incident metrics (qir_core)
+
+1) Done: what changed + why
+- Implemented validator logic in /Users/d/Projects/IncidentReview/crates/qir_core/src/validate/mod.rs:
+  - RFC3339 timestamp parsing warnings (no silent parse failures)
+  - strict ordering checks: `start <= first_observed <= it_awareness <= ack <= mitigate <= resolve` (when present)
+  - percent range warnings (nullable 0..100)
+- Implemented deterministic per-incident metrics in /Users/d/Projects/IncidentReview/crates/qir_core/src/metrics/mod.rs:
+  - metrics are computed only when required timestamps are present and parseable
+  - ordering violations produce warnings and result in `None` metrics (no silent correction)
+- Added fixture-backed tests for validation and metrics behavior.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_core/Cargo.toml
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/lib.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/validate/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/metrics/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/validate_and_metrics.rs
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Timestamp parsing currently only supports RFC3339. Jira/Slack exports often contain other formats; ingestion should normalize into RFC3339 or emit explicit warnings when unknown.
+
+5) Status: current phase + complete / in progress / blocked
+- Phase 1: in progress (Slack ingest + DB repos + rollups + analytics payloads next).
+
+6) Next steps
+- Implement Slack transcript ingest into `timeline_events` and add sanitized fixtures/tests.
+- Add DB repository helpers for listing incidents and attaching validation+metrics results.
+
+---
+
+## 2026-02-10 - Phase 1.4 Slack transcript ingest + basic DB repo helpers (qir_core)
+
+1) Done: what changed + why
+- Added Slack transcript ingestion in /Users/d/Projects/IncidentReview/crates/qir_core/src/ingest/slack_transcript.rs that:
+  - ingests each line into `timeline_events`
+  - parses RFC3339 timestamps when present and warns explicitly when missing (no silent defaults)
+- Added DB repository helpers in /Users/d/Projects/IncidentReview/crates/qir_core/src/repo/mod.rs to list/count incidents (foundation for dashboards and reporting).
+- Added sanitized Slack fixture + tests for transcript ingestion.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/lib.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/ingest/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/ingest/slack_transcript.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/repo/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/ingest_slack_transcript.rs
+- /Users/d/Projects/IncidentReview/fixtures/demo/slack_sample.txt
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Slack parsing is intentionally minimal (line-oriented). We should extend to support common Slack export formats (JSON export, “copy from Slack” formats) with explicit warnings when unknown.
+
+5) Status: current phase + complete / in progress / blocked
+- Phase 1: in progress (rollups/analytics payloads + report generation next).
+
+6) Next steps
+- Implement analytics payloads in `qir_core` (versioned) and wire them through `src-tauri` to the frontend for ECharts dashboards.
+- Implement deterministic Markdown report generator + golden snapshot tests.
+
+---
+
+## 2026-02-10 - Phases 2-4 Dashboard + report + thin Tauri RPC + UI wiring
+
+1) Done: what changed + why
+- Added versioned analytics payloads and dashboard dataset builder in /Users/d/Projects/IncidentReview/crates/qir_core/src/analytics/mod.rs so the frontend can render ECharts charts without computing metrics.
+- Added deterministic Markdown report generation in /Users/d/Projects/IncidentReview/crates/qir_core/src/report/mod.rs with golden snapshot test coverage.
+- Wired thin Tauri commands in /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs:
+  - `init_db` (migrate DB in app data dir)
+  - `seed_demo_jira` (ingest sanitized Jira CSV fixture)
+  - `get_dashboard_v1` (returns versioned analytics payload)
+  - `generate_report_md` (returns Markdown)
+- Implemented a basic React UI in /Users/d/Projects/IncidentReview/src/App.tsx to call commands, show ECharts severity chart, drill-down incident table, and display report Markdown.
+- Added runtime validation (Zod schemas) for command results (typed payload contracts).
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/package.json
+- /Users/d/Projects/IncidentReview/pnpm-lock.yaml
+- /Users/d/Projects/IncidentReview/src/App.tsx
+- /Users/d/Projects/IncidentReview/src/styles.css
+- /Users/d/Projects/IncidentReview/src/lib/tauri.ts
+- /Users/d/Projects/IncidentReview/src/lib/schemas.ts
+- /Users/d/Projects/IncidentReview/src/ui/useToasts.ts
+- /Users/d/Projects/IncidentReview/src/ui/ToastHost.tsx
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/lib.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/error.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/analytics/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/report/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/report_golden.rs
+- /Users/d/Projects/IncidentReview/fixtures/golden/qir_report_demo.md
+- /Users/d/Projects/IncidentReview/src-tauri/Cargo.toml
+- /Users/d/Projects/IncidentReview/src-tauri/src/main.rs
+- /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Frontend bundle size is large due to ECharts; later we should add code-splitting (dynamic import) to keep initial load lighter.
+- `src-tauri/tauri.conf.json` CSP is still `null`; we should tighten once UI feature-set stabilizes.
+- The app currently provides a demo seed and basic dashboard/report, but does not yet expose full import UX (file pickers, mapping UI persistence) or backup/restore flows.
+
+5) Status: current phase + complete / in progress / blocked
+- Phase 2: in progress (more dashboards + richer drill-down + reconciliation).
+- Phase 3: in progress (report sections beyond the minimal demo).
+- Phase 4: in progress (typed payload validation exists; expand commands and UI error details).
+- Phase 5: not started (AI must remain gated until evidence store exists and core is solid).
+
+6) Next steps
+- Add saved mapping profiles + Jira import UI (export-based) and wire through Tauri using typed payloads + runtime validation.
+- Implement backup/restore and sanitized export flows (local-only) and add fixtures/tests.
+- After evidence store exists, start `crates/qir_ai` with Ollama health checks and citation enforcement endpoints.
+
+---
+
+## 2026-02-10 - Phase 5 (partial) Local AI foundations (qir_ai) + health check wiring
+
+1) Done: what changed + why
+- Implemented local-only Ollama client health check in /Users/d/Projects/IncidentReview/crates/qir_ai/src/ollama.rs enforcing `127.0.0.1` base URLs (no remote AI).
+- Implemented a file-based evidence chunk store in /Users/d/Projects/IncidentReview/crates/qir_ai/src/evidence.rs so AI features can be evidence-backed without adding DB schema/migrations outside `qir_core`.
+- Implemented citation enforcement guardrail in /Users/d/Projects/IncidentReview/crates/qir_ai/src/guardrails.rs (hard fail `AI_CITATION_REQUIRED` if missing citations).
+- Wired a thin Tauri command `ai_health_check` in /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs and exposed it in the UI.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_ai/Cargo.toml
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/lib.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/ollama.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/evidence.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/guardrails.rs
+- /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs
+- /Users/d/Projects/IncidentReview/src/lib/schemas.ts
+- /Users/d/Projects/IncidentReview/src/App.tsx
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Ollama API surface is not yet used for drafting; only health checks are implemented. Draft endpoints must enforce citations against stored evidence chunks and must never compute deterministic metrics/timestamps.
+- Evidence store currently doesn’t implement chunking/embeddings/similarity search yet; those are next within `qir_ai`.
+
+5) Status: current phase + complete / in progress / blocked
+- Phase 5: in progress (foundations + guardrails in place; drafting/indexing not implemented yet).
+
+6) Next steps
+- Implement deterministic chunking + embeddings + similarity search in `qir_ai` and expose evidence index build via thin Tauri commands.
+- Add AI drafting endpoints that hard-require citations and return `UNKNOWN` where evidence is insufficient.
+
+---
+
+## 2026-02-10 - Deliverable Set 1 (part 1) Mapping profiles + Jira import engine (qir_core)
+
+1) Done: what changed + why
+- Implemented Jira mapping profile persistence in /Users/d/Projects/IncidentReview/crates/qir_core/src/profiles/jira.rs (CRUD over the existing `jira_mapping_profiles` table).
+- Implemented Jira CSV preview parsing in /Users/d/Projects/IncidentReview/crates/qir_core/src/ingest/jira_csv.rs to power a mapping UI (headers + sample rows).
+- Reworked Jira CSV ingestion into an import engine that returns deterministic results:
+  - counts: inserted / updated / skipped
+  - conflicts surfaced explicitly (no silent merges)
+  - warnings include non-RFC3339 timestamp parse warnings while preserving raw strings
+- Added sanitized fixtures and integration tests covering:
+  - profile persistence CRUD
+  - mapping-driven import correctness
+  - conflict surfacing for duplicate external IDs
+  - warnings for non-RFC3339 timestamps
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/lib.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/profiles/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/profiles/jira.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/ingest/jira_csv.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/jira_profiles_and_import.rs
+- /Users/d/Projects/IncidentReview/fixtures/demo/jira_duplicate_external_id.csv
+- /Users/d/Projects/IncidentReview/fixtures/demo/jira_non_rfc3339.csv
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Constraint conflict detection currently treats any SQLite constraint violation as a conflict to surface; if we later need more granular messaging, we can inspect extended error codes.
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 1: in progress (Tauri commands + frontend mapping/import UX next).
+
+6) Next steps
+- Add thin Tauri commands for mapping profile CRUD + CSV preview + import using selected profile.
+- Implement frontend Jira import UI: file picker, mapping UI with preview, save/reuse profiles, and result rendering for inserted/updated/skipped/warnings/conflicts.
+
+---
+
+## 2026-02-10 - Deliverable Set 1 (part 2) Thin Tauri commands + initial Jira import UI
+
+1) Done: what changed + why
+- Added thin Tauri commands in /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs for:
+  - `jira_csv_preview` (headers + sample rows)
+  - `jira_profiles_list`, `jira_profiles_upsert`, `jira_profiles_delete` (mapping profile CRUD)
+  - `jira_import_using_profile` (import Jira CSV using selected profile)
+- Updated the frontend to provide an export-based Jira CSV import UX in /Users/d/Projects/IncidentReview/src/App.tsx:
+  - file picker (`<input type="file">`)
+  - CSV preview table
+  - mapping UI with explicit required/optional labels
+  - profile save/reuse/delete
+  - import results (inserted/updated/skipped + warnings + conflicts)
+- Updated schemas in /Users/d/Projects/IncidentReview/src/lib/schemas.ts so all command payloads are runtime validated (typed contracts).
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs
+- /Users/d/Projects/IncidentReview/src/App.tsx
+- /Users/d/Projects/IncidentReview/src/styles.css
+- /Users/d/Projects/IncidentReview/src/lib/schemas.ts
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- The UI currently requires saving/selecting a profile before importing (explicit workflow). If we want “import without saving”, we can add a separate command that takes a mapping directly, but that is not required for Deliverable Set 1.
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 1: in progress (finish: ensure import result UX includes updated/skipped semantics, and ensure tests cover profile persistence + mapping application + conflict surfacing end-to-end).
+
+6) Next steps
+- Add an end-to-end test that saves a profile then imports using that profile to ensure profile persistence integrates with import.
+- Add an update vs skip fixture to validate `updated` and `skipped` counters deterministically.
+
+---
+
+## 2026-02-10 - Deliverable Set 1 (part 3) Update/skip semantics + integration coverage (qir_core)
+
+1) Done: what changed + why
+- Added integration test coverage in /Users/d/Projects/IncidentReview/crates/qir_core/tests/jira_profiles_and_import.rs for:
+  - updating an existing incident by `external_id` (counts as `updated`)
+  - skipping when no changes are detected (counts as `skipped`)
+  - using a persisted mapping profile as the source of truth for import mapping
+- This completes the required test surface for Deliverable Set 1: profile persistence, mapping correctness, and conflict surfacing.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/jira_profiles_and_import.rs
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- None blocking Deliverable Set 1. Remaining work is higher-level UX polish and expanding import format support.
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 1: complete.
+
+6) Next steps
+- Add a dedicated “Import” screen (separate from dashboards) and improve result rendering (group warnings by row/field).
+- Persist last-used profile selection in local app state to reduce repeated setup.
+
+---
+
+## 2026-02-10 - Jira update semantics: preserve-on-empty (binding decision)
+
+1) Done: what changed + why
+- Updated Jira import update behavior in /Users/d/Projects/IncidentReview/crates/qir_core/src/ingest/jira_csv.rs to enforce **PRESERVE-ON-EMPTY** semantics:
+  - empty/missing CSV cells do **not** overwrite existing stored values with NULL
+  - updates now merge incoming non-empty values into the existing record deterministically
+- Updated tests in /Users/d/Projects/IncidentReview/crates/qir_core/tests/jira_profiles_and_import.rs to encode this behavior.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/ingest/jira_csv.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/jira_profiles_and_import.rs
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- None identified for this change-set; preserve-on-empty reduces accidental data loss during repeated imports.
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 2: not started yet (next).
+
+6) Next steps
+- Implement timestamp raw preservation via migration (either *_raw columns or a raw table) and update validators to surface parse failures with raw retention.
+- Implement Slack import UX + backend commands + fixtures/tests.
+
+---
+
+## 2026-02-10 - Deliverable Set 2 foundations: timestamp raw preservation + validation report
+
+1) Done: what changed + why
+- Wired the existing migration /Users/d/Projects/IncidentReview/migrations/0002_add_timestamp_raw_columns.sql into the deterministic migration runner so timestamp raw preservation is applied consistently for both on-disk and in-memory DBs.
+- Extended the incident domain model to include `*_ts_raw` fields and updated incident listing queries to read them, enabling “preserve raw + surface warnings” behavior without silent defaults.
+- Added deterministic, allowlist-only timestamp normalization helpers in /Users/d/Projects/IncidentReview/crates/qir_core/src/normalize/timestamps.rs (no fuzzy parsing). This supports the DS2 contract: canonical RFC3339 UTC when deterministically parseable; otherwise preserve raw + explicit warnings.
+- Enhanced validators to surface raw timestamp anomalies per field and added a deterministic “validate all incidents” report function to support the upcoming Validation/Anomalies UI.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/db/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/domain/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/repo/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/normalize/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/normalize/timestamps.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/validate/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/lib.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/validate_and_metrics.rs
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Timestamp normalization currently only allowlists a small set of timezone-less formats (assuming UTC with explicit warnings). We may need to expand the allowlist for Jira-export-specific formats, but we will not add fuzzy parsing.
+- Jira ingest still needs to be updated to actually *use* the new normalization helpers and store raw timestamps into `*_ts_raw` (next change-set).
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 2: in progress (timestamp contract foundations done; Slack UX + anomaly UI next).
+
+6) Next steps
+- Update Jira ingest to use deterministic timestamp normalization and persist `*_ts_raw` while keeping preserve-on-empty semantics.
+- Implement Slack ingest backend (format detection + incident attach/create shell) and expose thin Tauri commands.
+- Implement Validation/Anomalies UI and Slack Import UI in the frontend using typed payload contracts.
+
+---
+
+## 2026-02-10 - Jira ingest updated for timestamp normalization + raw preservation
+
+1) Done: what changed + why
+- Updated Jira CSV import in /Users/d/Projects/IncidentReview/crates/qir_core/src/ingest/jira_csv.rs to enforce the DS2 timestamp contract:
+  - canonical incident timestamp columns (`*_ts`) are now RFC3339-only (UTC)
+  - non-RFC3339 or unparseable timestamp inputs are preserved deterministically in `*_ts_raw`
+  - explicit warnings are emitted for normalization, timezone assumptions, and unparseable values (no silent defaults)
+- Extended preserve-on-empty merge logic for timestamp fields by adding a “provided vs not provided” distinction so that:
+  - missing/empty CSV cells do not overwrite either canonical or raw values
+  - provided values can intentionally clear `*_ts_raw` (e.g., when replaced with RFC3339)
+- Updated tests to assert canonical NULL + raw preserved for non-RFC3339 fixtures.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/ingest/jira_csv.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/jira_profiles_and_import.rs
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- The deterministic timestamp allowlist intentionally does not parse ambiguous locale formats like `MM/DD/YYYY ...`; those values will remain raw-only with warnings.
+- We may need to expand the allowlist for Jira-export-specific formats (e.g., offset forms) later, but we will not add fuzzy parsing.
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 2: in progress (timestamp contract implemented for Jira ingest; Slack ingest UX + anomaly UI next).
+
+6) Next steps
+- Implement Slack ingest backend (format detection + incident attach/create shell) and expose thin Tauri commands.
+- Add a Validation/Anomalies view in the frontend backed by `qir_core`’s validation report payload.
+
+---
+
+## 2026-02-10 - Slack ingest backend (export-based) + thin Tauri commands (DS2)
+
+1) Done: what changed + why
+- Implemented Slack transcript format detection + deterministic ingest in /Users/d/Projects/IncidentReview/crates/qir_core/src/ingest/slack_transcript.rs:
+  - Supported formats:
+    - line-oriented RFC3339 transcript (`line_rfc3339`)
+    - Slack JSON export array (`slack_json_export`) with deterministic Slack `ts` conversion (no float parsing)
+    - unknown formats fall back to raw line ingestion with explicit warnings (no guessing timestamps)
+  - Ingest now attaches events to a chosen incident OR creates a new “Slack-only incident shell” deterministically (title required; no silent defaults).
+- Added sanitized fixtures for JSON export + paste-style transcript and expanded tests to cover:
+  - event creation
+  - warning emission for missing/unparseable timestamps
+  - incident attachment behavior
+- Added thin Tauri commands in /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs for:
+  - `slack_preview`
+  - `slack_ingest`
+  - `incidents_list` (for incident selection in UI)
+  - `validation_report` (for upcoming anomaly UI)
+- Added typed Zod schemas in /Users/d/Projects/IncidentReview/src/lib/schemas.ts for the new payloads.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/ingest/slack_transcript.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/ingest_slack_transcript.rs
+- /Users/d/Projects/IncidentReview/fixtures/demo/slack_export_sample.json
+- /Users/d/Projects/IncidentReview/fixtures/demo/slack_paste_sample.txt
+- /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs
+- /Users/d/Projects/IncidentReview/src/lib/schemas.ts
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Slack JSON export formats can vary (per-channel files, different fields). Current implementation targets a deterministic subset: JSON arrays containing objects with `text` and optional `ts`/`user`.
+- The UI still needs to expose the Slack import flow and the Validation/Anomalies view (next change-set).
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 2: in progress (Slack ingest backend + commands complete; UI + validation screen next).
+
+6) Next steps
+- Implement Slack Import UI (file picker + paste box + incident select/create) calling `slack_preview` and `slack_ingest`.
+- Implement Validation/Anomalies UI calling `validation_report` with drill-down to incidents.
+
+---
+
+## 2026-02-10 - Deliverable Set 2 complete: Slack Import UI + Validation UI + timestamp contract tests
+
+1) Done: what changed + why
+- Implemented the DS2 frontend UX in /Users/d/Projects/IncidentReview/src/App.tsx:
+  - Slack Import flow with both file picker and paste box
+  - attach transcript to an existing incident or create a new Slack-only incident shell (title required)
+  - preview (detected format + counts + warnings) and ingest result rendering (counts + warnings)
+  - Validation/Anomalies view that lists incidents with validator warnings and allows filtering the incidents drill-down table by incident id
+- Added a second deterministic timestamp normalization fixture + test so the contract is covered for:
+  - allowlisted, timezone-less formats (assume UTC with explicit warning)
+  - raw preservation for non-RFC3339 inputs
+- Updated /Users/d/Projects/IncidentReview/PLANS.md progress notes to reflect DS2 status.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/src/App.tsx
+- /Users/d/Projects/IncidentReview/fixtures/demo/jira_allowlisted_ts.csv
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/jira_profiles_and_import.rs
+- /Users/d/Projects/IncidentReview/PLANS.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Validation view currently surfaces `qir_core` validator warnings only; ingest-time warnings are only shown at import time (not persisted). This is acceptable for DS2 but may be worth improving later.
+- Slack JSON exports can vary; current parser supports deterministic JSON arrays with `text` and optional `ts`/`user`.
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 2: complete.
+
+6) Next steps
+- Decide the next milestone (likely Deliverable Set 3: dashboards expansion + deterministic report polishing, or backup/restore/export workflows).
+- Add an “Incident detail” view to complement the incidents table and the validation list.
+
+---
+
+## 2026-02-10 - DS3 change-set 1: Deterministic storytelling analytics + report v1 expansion
+
+1) Done: what changed + why
+- Hardened and finalized the versioned analytics payload `DashboardPayloadV2` in `crates/qir_core` so DS3 dashboards can render from deterministic backend datasets only (no UI metric computation).
+- Expanded the deterministic Markdown report generator to include executive summary, metrics distribution table, detection/response/vendor sections, stable incident table ordering, and an explicit validation/anomalies appendix.
+- Updated the golden snapshot fixture + tests so report output stays stable and reproducible.
+- Fixed the incident drill-down table UI columns to align with the V2 payload (show awareness lag + time to mitigate instead of MTTA).
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/analytics/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/report/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/report_golden.rs
+- /Users/d/Projects/IncidentReview/fixtures/golden/qir_report_demo.md
+- /Users/d/Projects/IncidentReview/src/App.tsx
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- “Weighted pain” is currently computed as `impact_pct × degradation_pct × duration_seconds` (integer). This is deterministic and matches the documented formula shape, but the unit scale is large; we may later normalize to minutes or hours for more readable chart axes.
+- The DS3 dashboards UI still needs a clearer navigation structure so Dashboards and Report are first-class sections (next change-set).
+- Consider adding an incident detail drawer for richer drill-down context (timeline events + artifacts) without pushing logic into the UI.
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 3: in progress (backend datasets + report expanded and golden-tested; UI dashboards + incident detail next).
+
+6) Next steps
+- Implement DS3 dashboard pages (Detection/Vendor-Service/Response) in the UI using `get_dashboard_v2`, with click-to-filter drill-down backed by `incident_ids`.
+- Add a minimal incident detail view/drawer wired through Tauri to `qir_core` so drill-down is more informative without UI-side computation.
+
+---
+
+## 2026-02-10 - DS3 start: story fields in schema + Jira ingest mapping support
+
+1) Done: what changed + why
+- Started Deliverable Set 3 by adding optional incident fields needed for storytelling dashboards and report polish:
+  - `detection_source`
+  - `vendor`
+  - `service`
+- Implemented these as nullable SQLite columns via /Users/d/Projects/IncidentReview/migrations/0003_add_story_fields.sql and wired the migration into the deterministic runner in /Users/d/Projects/IncidentReview/crates/qir_core/src/db/mod.rs.
+- Extended Jira CSV mapping/import in /Users/d/Projects/IncidentReview/crates/qir_core/src/ingest/jira_csv.rs to map these fields (optional) with preserve-on-empty semantics (no silent defaults).
+- Updated domain and repo query shape so dashboards/reporting can read the new fields deterministically.
+- Updated /Users/d/Projects/IncidentReview/PLANS.md to mark DS2 complete and DS3 in progress.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/migrations/0003_add_story_fields.sql
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/db/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/domain/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/repo/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/ingest/jira_csv.rs
+- /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/ingest_jira_csv.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/jira_profiles_and_import.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/report_golden.rs
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- The frontend Jira mapping UI has not yet been expanded to include these new optional mappings; dashboards can still render UNKNOWN buckets until we add those mapping fields to the UI (next change-set).
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 3: in progress (schema + ingest foundations complete; analytics payloads + dashboards + report expansion next).
+
+6) Next steps
+- Implement versioned analytics payload(s) for Detection/Response/Vendor-Service stories in /Users/d/Projects/IncidentReview/crates/qir_core/src/analytics and add reconciliation + drill-down tests.
+- Expand the frontend dashboards UI to render the new payloads via ECharts and support drill-down to backing incidents.
+
+---
+
+## 2026-02-10 - DS3 analytics: DashboardPayloadV2 (Detection/Response/Vendor-Service)
+
+1) Done: what changed + why
+- Implemented a new versioned analytics payload `DashboardPayloadV2` in /Users/d/Projects/IncidentReview/crates/qir_core/src/analytics/mod.rs to support three storytelling dashboards required by DS3:
+  - Detection story: detection source mix + IT awareness lag distribution
+  - Vendor/service reliability: top vendors/services by incident count + weighted pain (impact × degradation × duration) where available
+  - Response story: time to mitigation + time to resolve distributions
+- Ensured every chart dataset reconciles to the incident total by including explicit `UNKNOWN` (and `OTHER` where needed) buckets and providing `incident_ids` for drill-down (backend-owned query keys via stable `key` strings).
+- Added a sanitized story fixture /Users/d/Projects/IncidentReview/fixtures/demo/jira_story.csv and an integration test /Users/d/Projects/IncidentReview/crates/qir_core/tests/analytics_v2.rs that asserts:
+  - bucket counts sum to total incidents
+  - union of drill-down incident ids covers the full incident set deterministically
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/analytics/mod.rs
+- /Users/d/Projects/IncidentReview/fixtures/demo/jira_story.csv
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/analytics_v2.rs
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- The UI still uses DashboardPayloadV1; next change-set will wire DashboardPayloadV2 through thin Tauri commands + ECharts UI with drill-down.
+- Pain calculations intentionally ignore incidents without the needed deterministic inputs; buckets still include all incident ids so drill-down is complete even when pain is partially unknown.
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 3: in progress (analytics payloads implemented; UI + report expansion next).
+
+6) Next steps
+- Add a new Tauri command (thin) to fetch DashboardPayloadV2 and update the frontend to render the Detection/Response/Vendor-Service dashboards with drill-down.
+- Expand the deterministic Markdown report generator to QIR Report v1 using the same backend payloads + a validation appendix, and update golden snapshot tests.
+
+---
+
+## 2026-02-10 - DS3 dashboards wired: Tauri get_dashboard_v2 + ECharts story UI + drill-down
+
+1) Done: what changed + why
+- Wired the new analytics payload through the thin Tauri layer:
+  - Added `get_dashboard_v2` command in /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs returning `DashboardPayloadV2` from `qir_core`.
+- Updated frontend typed contracts and UI to render the DS3 storytelling dashboards from backend payloads only (no UI metric computation):
+  - Added Zod schemas for DashboardPayloadV2 and story buckets in /Users/d/Projects/IncidentReview/src/lib/schemas.ts.
+  - Updated /Users/d/Projects/IncidentReview/src/App.tsx to:
+    - load DashboardPayloadV2
+    - render Detection story, Response story, and Vendor/Service reliability charts via ECharts
+    - support drill-down by applying backend-provided `incident_ids` to filter the incident list deterministically
+    - add a minimal “Jump To” nav so Dashboards/Report aren’t buried
+- Expanded Jira mapping UI in /Users/d/Projects/IncidentReview/src/App.tsx to include optional fields `detection_source`, `vendor`, and `service` so exports can populate story dashboards without manual DB edits.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs
+- /Users/d/Projects/IncidentReview/src/lib/schemas.ts
+- /Users/d/Projects/IncidentReview/src/App.tsx
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- The current “pain” chart uses a raw pain unit (impact * degradation * duration_seconds). We may want to add a friendly scaling (e.g., hours) later, but the deterministic drill-down remains correct now.
+- Report generator still uses the older minimal report; next change-set will expand it to QIR Report v1 and update golden fixtures.
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 3: in progress (dashboards done; report expansion + golden tests next).
+
+6) Next steps
+- Expand /Users/d/Projects/IncidentReview/crates/qir_core/src/report/mod.rs to deterministic QIR Report v1:
+  - executive summary, metrics summary tables, incidents table, detection/response highlights, and validation appendix
+- Update /Users/d/Projects/IncidentReview/fixtures/golden/qir_report_demo.md and snapshot tests to match the new deterministic output.
+
+---
+
+## 2026-02-10 - DS3 UX polish: Incident detail drawer + schema contract cleanup (restore tauri build)
+
+1) Done: what changed + why
+- Completed the DS3 drill-down UX by adding an Incident Detail drawer that loads deterministic detail payloads from the backend (no UI metric computation):
+  - Uses existing thin Tauri command `incident_detail` (already wired) and validates the response at the boundary with Zod.
+  - Shows computed metrics (formatted), validation/anomaly warnings, timeline events, and artifacts for the selected incident.
+- Fixed a build-blocking contract issue introduced during the interrupted edit:
+  - Removed duplicate TypeScript/Zod schema declarations for `IncidentMetricsSchema` and `IncidentDetailSchema` to keep schemas single-source and ensure `pnpm tauri build` stays green.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/src/App.tsx
+- /Users/d/Projects/IncidentReview/src/lib/schemas.ts
+- /Users/d/Projects/IncidentReview/PLANS.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- The incident detail drawer currently focuses on read-only visibility. If we later add editing, we should keep all deterministic derivations in `crates/qir_core` and treat UI edits as explicit user actions.
+- The Vite build warns about large chunks (not a correctness issue). We can consider code-splitting later if startup performance becomes a concern.
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 3: complete (dashboards + deterministic report + drill-down UX + full verification green).
+
+6) Next steps
+- Confirm the next milestone (likely backup/restore + sanitized export + demo dataset tooling), keeping AI features gated.
