@@ -13,3 +13,4 @@ ureq = { version = "2.12.1", features = ["json"] }
 
 [dev-dependencies]
 pretty_assertions = "1"
+tempfile = "3"

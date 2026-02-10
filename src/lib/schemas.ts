@@ -69,6 +69,21 @@ export const InitDbResponseSchema = z.object({
   db_path: z.string(),
 });
 
+export const AppInfoSchema = z.object({
+  app_version: z.string(),
+  git_commit_hash: z.string().nullable().optional(),
+  current_db_path: z.string(),
+  latest_migration: z.string(),
+  applied_migrations: z.array(z.string()),
+});
+
+export const WorkspaceMigrationStatusSchema = z.object({
+  dbPath: z.string(),
+  latestMigration: z.string(),
+  appliedMigrations: z.array(z.string()),
+  pendingMigrations: z.array(z.string()),
+});
+
 export const JiraIngestSummarySchema = z.object({
   inserted: z.number().int().nonnegative(),
   warnings: z.array(ValidationWarningSchema),
@@ -175,6 +190,21 @@ export const AiModelInfoSchema = z.object({
 
 export const AiModelInfoListSchema = z.array(AiModelInfoSchema);
 
+export const AiDraftArtifactSchema = z.object({
+  id: z.number().int(),
+  quarter_label: z.string(),
+  section_type: z.string(),
+  draft_text: z.string(),
+  citation_chunk_ids: z.array(z.string()),
+  model_name: z.string(),
+  model_params_hash: z.string(),
+  prompt_template_version: z.string(),
+  created_at: z.string(),
+  artifact_hash: z.string(),
+});
+
+export const AiDraftArtifactListSchema = z.array(AiDraftArtifactSchema);
+
 export const EvidenceSourceTypeSchema = z.enum([
   "sanitized_export",
   "slack_transcript",
@@ -219,6 +249,15 @@ export const EvidenceChunkSummarySchema = z.object({
 
 export const EvidenceChunkSummaryListSchema = z.array(EvidenceChunkSummarySchema);
 
+export const EvidenceChunkSchema = EvidenceChunkSummarySchema.extend({
+  text: z.string(),
+});
+
+export const EvidenceContextResponseSchema = z.object({
+  centerChunkId: z.string(),
+  chunks: EvidenceChunkSummaryListSchema,
+});
+
 export const BuildChunksResultSchema = z.object({
   source_id: z.string().nullable().optional(),
   chunk_count: z.number().int().nonnegative(),
@@ -249,12 +288,21 @@ export const EvidenceQueryResponseSchema = z.object({
   hits: z.array(EvidenceQueryHitSchema),
 });
 
-export const AiSectionIdSchema = z.enum(["exec_summary"]);
+export const AiSectionIdSchema = z.enum([
+  "exec_summary",
+  "incident_highlights_top_n",
+  "theme_analysis",
+  "action_plan_next_quarter",
+  "quarter_narrative_recap",
+]);
 
 export const AiDraftResponseSchema = z.object({
   section_id: AiSectionIdSchema,
   markdown: z.string(),
   citations: z.array(CitationSchema),
+  model_name: z.string(),
+  model_params_hash: z.string(),
+  prompt_template_version: z.string(),
 });
 
 export const AiIndexStatusSchema = z.object({
@@ -262,6 +310,8 @@ export const AiIndexStatusSchema = z.object({
   model: z.string().nullable().optional(),
   dims: z.number().int().nonnegative().nullable().optional(),
   chunk_count: z.number().int().nonnegative(),
+  chunks_total: z.number().int().nonnegative().optional(),
+  source_id: z.string().nullable().optional(),
   updated_at: z.string().nullable().optional(),
 });
 

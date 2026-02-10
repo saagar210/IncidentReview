@@ -27,8 +27,10 @@ import {
   ValidationReportSchema,
   WorkspaceInfoSchema,
   WorkspaceMetadataSchema,
+  WorkspaceMigrationStatusSchema,
 } from "./lib/schemas";
 import { AppNav } from "./ui/AppNav";
+import { Modal } from "./ui/Modal";
 import { ToastHost } from "./ui/ToastHost";
 import { useToasts } from "./ui/useToasts";
 import { WorkspaceSection } from "./features/workspace/WorkspaceSection";
@@ -41,6 +43,7 @@ import { ReportSection } from "./features/report/ReportSection";
 import { DashboardsSection } from "./features/dashboards/DashboardsSection";
 import { IncidentDetailDrawer } from "./features/dashboards/IncidentDetailDrawer";
 import { AiSection } from "./features/ai/AiSection";
+import { AboutSection } from "./features/about/AboutSection";
 
 export default function App() {
   const { toasts, pushToast, dismissToast } = useToasts();
@@ -174,6 +177,12 @@ export default function App() {
   const [workspaceMeta, setWorkspaceMeta] = useState<null | { db_path: string; is_empty: boolean }>(null);
   const [workspaceNewFilename, setWorkspaceNewFilename] = useState<string>("incidentreview.sqlite");
   const [workspaceRecentPick, setWorkspaceRecentPick] = useState<string>("");
+  const [migrationGuard, setMigrationGuard] = useState<null | {
+    action: "init_db" | "open_workspace";
+    dbPath: string;
+    latestMigration: string;
+    pendingMigrations: string[];
+  }>(null);
 
   const [backupResult, setBackupResult] = useState<null | {
     backup_dir: string;
@@ -305,6 +314,68 @@ export default function App() {
     null | Array<{ id: number; external_id: string | null; title: string; warnings: Array<{ code: string; message: string; details?: string | null }> }>
   >(null);
 
+  async function preflightWorkspaceMigrations(dbPath: string, action: "init_db" | "open_workspace") {
+    try {
+      const status = await invokeValidated(
+        "workspace_migration_status",
+        { dbPath },
+        WorkspaceMigrationStatusSchema
+      );
+      if (status.pendingMigrations.length > 0) {
+        setMigrationGuard({
+          action,
+          dbPath: status.dbPath,
+          latestMigration: status.latestMigration,
+          pendingMigrations: status.pendingMigrations,
+        });
+        return false;
+      }
+      return true;
+    } catch (e) {
+      const appErr = extractAppError(e);
+      // First-run and "default workspace does not exist yet" is OK; init_db can create it.
+      if (appErr?.code === "WORKSPACE_DB_NOT_FOUND") return true;
+      pushToast({ kind: "error", title: "Migration preflight failed", message: String(e) });
+      return false;
+    }
+  }
+
+  async function ensureDbInitialized(opts?: { toastOnSuccess?: boolean; skipPreflight?: boolean }) {
+    const toastOnSuccess = opts?.toastOnSuccess ?? false;
+    const skipPreflight = opts?.skipPreflight ?? false;
+
+    if (!skipPreflight) {
+      try {
+        const info = await invokeValidated("workspace_get_current", undefined, WorkspaceInfoSchema);
+        const okToMigrate = await preflightWorkspaceMigrations(info.current_db_path, "init_db");
+        if (!okToMigrate) return;
+      } catch (e) {
+        pushToast({ kind: "error", title: "Workspace load failed", message: String(e) });
+        return;
+      }
+    }
+
+    try {
+      const res = await invokeValidated("init_db", undefined, InitDbResponseSchema);
+      setDbPath(res.db_path);
+      if (toastOnSuccess) {
+        pushToast({ kind: "success", title: "DB initialized", message: res.db_path });
+      }
+    } catch (e) {
+      const appErr = extractAppError(e);
+      if (appErr) {
+        const guidance = guidanceForWorkspaceErrorCode(appErr.code);
+        pushToast({
+          kind: "error",
+          title: "Workspace init failed",
+          message: guidance ? `${appErr.code}: ${appErr.message}\n\n${guidance}` : `${appErr.code}: ${appErr.message}`,
+        });
+      } else {
+        pushToast({ kind: "error", title: "Workspace init failed", message: String(e) });
+      }
+    }
+  }
+
   useEffect(() => {
     void (async () => {
       try {
@@ -321,28 +392,18 @@ export default function App() {
             message: `${info.load_error.code}: ${info.load_error.message}`,
           });
         }
+
+        // Startup migration guard: if the selected workspace has pending migrations, prompt to back up before we migrate.
+        const okToMigrate = await preflightWorkspaceMigrations(info.current_db_path, "init_db");
+        if (!okToMigrate) return;
       } catch (e) {
         pushToast({ kind: "error", title: "Workspace load failed", message: String(e) });
+        return;
       }
 
       // Ensure the current workspace DB is usable. For the default app-data workspace this
       // creates the DB on first run.
-      try {
-        const res = await invokeValidated("init_db", undefined, InitDbResponseSchema);
-        setDbPath(res.db_path);
-      } catch (e) {
-        const appErr = extractAppError(e);
-        if (appErr) {
-          const guidance = guidanceForWorkspaceErrorCode(appErr.code);
-          pushToast({
-            kind: "error",
-            title: "Workspace init failed",
-            message: guidance ? `${appErr.code}: ${appErr.message}\n\n${guidance}` : `${appErr.code}: ${appErr.message}`,
-          });
-        } else {
-          pushToast({ kind: "error", title: "Workspace init failed", message: String(e) });
-        }
-      }
+      await ensureDbInitialized({ toastOnSuccess: false, skipPreflight: true });
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -371,13 +432,7 @@ export default function App() {
   }
 
   async function onInitDb() {
-    try {
-      const res = await invokeValidated("init_db", undefined, InitDbResponseSchema);
-      setDbPath(res.db_path);
-      pushToast({ kind: "success", title: "DB initialized", message: res.db_path });
-    } catch (e) {
-      pushToast({ kind: "error", title: "Init failed", message: String(e) });
-    }
+    await ensureDbInitialized({ toastOnSuccess: true, skipPreflight: false });
   }
 
   async function onSeedDemo() {
@@ -561,6 +616,7 @@ export default function App() {
       { label: "Backup/Restore", href: "#data" },
       { label: "Report", href: "#report" },
       { label: "AI (Phase 5)", href: "#ai" },
+      { label: "About", href: "#about" },
     ],
     []
   );
@@ -603,18 +659,24 @@ export default function App() {
     }
   }
 
+  async function openWorkspaceAtPath(file: string) {
+    clearWorkspaceScopedState();
+    const meta = await invokeValidated("workspace_open", { dbPath: file }, WorkspaceMetadataSchema);
+    setWorkspaceMeta(meta);
+    setDbPath(meta.db_path);
+    const info = await invokeValidated("workspace_get_current", undefined, WorkspaceInfoSchema);
+    setWorkspaceInfo(info);
+    pushToast({ kind: "success", title: "Workspace opened", message: meta.db_path });
+    await refreshAllViewsAfterWorkspaceChange();
+  }
+
   async function onWorkspaceOpen() {
     try {
       const file = await pickDbFile();
       if (!file) return;
-      clearWorkspaceScopedState();
-      const meta = await invokeValidated("workspace_open", { dbPath: file }, WorkspaceMetadataSchema);
-      setWorkspaceMeta(meta);
-      setDbPath(meta.db_path);
-      const info = await invokeValidated("workspace_get_current", undefined, WorkspaceInfoSchema);
-      setWorkspaceInfo(info);
-      pushToast({ kind: "success", title: "Workspace opened", message: meta.db_path });
-      await refreshAllViewsAfterWorkspaceChange();
+      const okToMigrate = await preflightWorkspaceMigrations(file, "open_workspace");
+      if (!okToMigrate) return;
+      await openWorkspaceAtPath(file);
     } catch (e) {
       const appErr = extractAppError(e);
       if (appErr) {
@@ -636,14 +698,9 @@ export default function App() {
         pushToast({ kind: "error", title: "No workspace selected", message: "Pick a recent workspace first." });
         return;
       }
-      clearWorkspaceScopedState();
-      const meta = await invokeValidated("workspace_open", { dbPath: workspaceRecentPick }, WorkspaceMetadataSchema);
-      setWorkspaceMeta(meta);
-      setDbPath(meta.db_path);
-      const info = await invokeValidated("workspace_get_current", undefined, WorkspaceInfoSchema);
-      setWorkspaceInfo(info);
-      pushToast({ kind: "success", title: "Workspace switched", message: meta.db_path });
-      await refreshAllViewsAfterWorkspaceChange();
+      const okToMigrate = await preflightWorkspaceMigrations(workspaceRecentPick, "open_workspace");
+      if (!okToMigrate) return;
+      await openWorkspaceAtPath(workspaceRecentPick);
     } catch (e) {
       const appErr = extractAppError(e);
       if (appErr) {
@@ -929,6 +986,64 @@ export default function App() {
     <main className="app">
       <ToastHost toasts={toasts} onDismiss={dismissToast} />
 
+      {migrationGuard ? (
+        <Modal
+          title="Pending Migrations Detected"
+          footer={
+            <>
+              <button
+                className="btn"
+                type="button"
+                onClick={() => {
+                  window.location.hash = "#data";
+                  setMigrationGuard(null);
+                }}
+              >
+                Backup Now
+              </button>
+              <button className="btn" type="button" onClick={() => setMigrationGuard(null)}>
+                Cancel
+              </button>
+              <button
+                className="btn btn--accent"
+                type="button"
+                onClick={() => {
+                  const g = migrationGuard;
+                  setMigrationGuard(null);
+                  if (g.action === "init_db") {
+                    void ensureDbInitialized({ toastOnSuccess: true, skipPreflight: true });
+                  } else {
+                    void openWorkspaceAtPath(g.dbPath);
+                  }
+                }}
+              >
+                Continue (Migrate)
+              </button>
+            </>
+          }
+        >
+          <p className="hint">
+            This workspace DB has <span className="mono">{migrationGuard.pendingMigrations.length}</span> pending migrations. To
+            avoid accidental data loss, back up the workspace before continuing. Migrations are applied deterministically in{" "}
+            <code>crates/qir_core</code>.
+          </p>
+          <p className="hint">
+            Workspace: <span className="mono">{migrationGuard.dbPath}</span>
+          </p>
+          <p className="hint">
+            Latest migration: <span className="mono">{migrationGuard.latestMigration}</span>
+          </p>
+          <div className="subhead">Pending migrations</div>
+          <ul className="list">
+            {migrationGuard.pendingMigrations.map((m) => (
+              <li key={m}>
+                <span className="mono">{m}</span>
+              </li>
+            ))}
+          </ul>
+        </Modal>
+      ) : null}
+
       <IncidentDetailDrawer
         open={incidentDetailOpen}
         loading={incidentDetailLoading}
@@ -1089,6 +1204,8 @@ export default function App() {
           pushToast({ kind: t.kind, title: t.title, message: t.message });
         }}
       />
+
+      <AboutSection />
     </main>
   );
 }

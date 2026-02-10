@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use rusqlite::Connection;
+use rusqlite::OptionalExtension;
 
 use crate::error::AppError;
 
@@ -29,8 +30,87 @@ const MIGRATION_0003: (&str, &str) = (
     )),
 );
 
+const MIGRATION_0004: (&str, &str) = (
+    "0004_add_ai_drafts.sql",
+    include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../migrations/0004_add_ai_drafts.sql"
+    )),
+);
+
 fn migrations() -> Vec<(&'static str, &'static str)> {
-    vec![MIGRATION_0001, MIGRATION_0002, MIGRATION_0003]
+    vec![MIGRATION_0001, MIGRATION_0002, MIGRATION_0003, MIGRATION_0004]
+}
+
+pub fn latest_migration_name() -> &'static str {
+    migrations()
+        .last()
+        .map(|(name, _)| *name)
+        .unwrap_or("NONE")
+}
+
+pub fn applied_migration_names(conn: &Connection) -> Result<Vec<String>, AppError> {
+    // Preflight-safe: do not create tables here.
+    let exists: Option<String> = conn
+        .query_row(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='_migrations'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| {
+            AppError::new(
+                "DB_MIGRATIONS_QUERY_FAILED",
+                "Failed to detect migrations table",
+            )
+            .with_details(e.to_string())
+        })?;
+
+    if exists.is_none() {
+        return Ok(Vec::new());
+    }
+
+    let mut stmt = conn
+        .prepare("SELECT name FROM _migrations ORDER BY name ASC")
+        .map_err(|e| {
+            AppError::new(
+                "DB_MIGRATIONS_QUERY_FAILED",
+                "Failed to query applied migrations",
+            )
+            .with_details(e.to_string())
+        })?;
+
+    let rows = stmt.query_map([], |row| row.get::<_, String>(0)).map_err(|e| {
+        AppError::new(
+            "DB_MIGRATIONS_QUERY_FAILED",
+            "Failed to read applied migrations",
+        )
+        .with_details(e.to_string())
+    })?;
+
+    let mut out = Vec::new();
+    for r in rows {
+        out.push(r.map_err(|e| {
+            AppError::new(
+                "DB_MIGRATIONS_QUERY_FAILED",
+                "Failed to read applied migration row",
+            )
+            .with_details(e.to_string())
+        })?);
+    }
+    Ok(out)
+}
+
+pub fn pending_migration_names(conn: &Connection) -> Result<Vec<String>, AppError> {
+    let applied = applied_migration_names(conn)?;
+    let applied_set: HashSet<String> = applied.into_iter().collect();
+    let mut out: Vec<String> = Vec::new();
+    for (name, _) in migrations() {
+        if !applied_set.contains(name) {
+            out.push(name.to_string());
+        }
+    }
+    Ok(out)
 }
 
 pub fn open(path: &Path) -> Result<Connection, AppError> {

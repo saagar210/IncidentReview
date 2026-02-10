@@ -1,4 +1,5 @@
 pub mod analytics;
+pub mod ai_drafts;
 pub mod backup;
 pub mod db;
 pub mod demo;

@@ -1874,3 +1874,357 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 
 6) Next steps
 - Continue Phase 5 follow-ups: additional draft sections (Step 2) and an evidence viewer (Step 3).
+
+---
+
+## 2026-02-10 - Productization M1.1: Persist AI draft artifacts (backend + RPC)
+
+1) Done: what changed + why
+- Added a new `qir_core`-owned storage layer for AI draft artifacts (local-only audit trail; does not modify deterministic metrics or reports).
+- Implemented migration `0004_add_ai_drafts.sql` and `qir_core::ai_drafts` repo functions to create/list/get drafts.
+- Extended `qir_ai` draft responses to include model provenance metadata: `model_name`, `model_params_hash`, and `prompt_template_version`.
+- Added thin Tauri commands to persist and query AI drafts from the current workspace DB.
+- Added tests verifying:
+  - stable hashing for draft artifacts
+  - storing without citations fails with `AI_CITATION_REQUIRED` and does not insert rows.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/migrations/0004_add_ai_drafts.sql
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/db/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/lib.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/ai_drafts/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/ai_drafts.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/draft/mod.rs
+- /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs
+- /Users/d/Projects/IncidentReview/src/lib/schemas.ts
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Draft artifacts may contain sensitive content. M1 requires a UI toggle to disable local draft persistence (default ON) and clear user messaging that drafts are stored locally.
+
+5) Status: current phase + complete / in progress / blocked
+- M1: in progress (backend persistence complete; UI history/provenance panels next).
+
+6) Next steps
+- Implement UI draft history + provenance view (including "open cited chunk" linking into Evidence Viewer to be built in M2).
+
+---
+
+## 2026-02-10 - Productization M1.2: Provenance UI + draft history (frontend)
+
+1) Done: what changed + why
+- Updated the AI screen to persist citation-backed drafts into the current workspace DB (when enabled) to provide an auditable local trail of AI outputs.
+- Added a local-only privacy toggle (“Store AI drafts locally”) defaulting to ON (stored in `localStorage`; no telemetry).
+- Added a Draft Artifacts history list (optional quarter filter) and a provenance panel that shows model metadata, hashes, timestamps, and citation chunk IDs.
+- Added a convenience action to add cited chunk IDs back into the active citation set (preparing for Evidence Viewer routing in M2).
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/src/features/ai/AiSection.tsx
+- /Users/d/Projects/IncidentReview/src/features/ai/AiSection.test.tsx
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Draft artifacts can contain sensitive text. The toggle reduces risk but does not redact content; consider adding a “Delete drafts for this quarter” action later (local-only) if needed.
+- Draft history list currently loads full draft text in the list payload; if this becomes large, switch to a summary list endpoint and fetch full drafts by id.
+
+5) Status: current phase + complete / in progress / blocked
+- Productization M1: complete.
+- Productization M2: next (Evidence Viewer UX).
+
+6) Next steps
+- Implement Evidence Viewer (search + full chunk behind click + context prev/next) and wire “open cited chunk” into that route.
+- Add chunk retrieval endpoints (`evidence_get_chunk`, `evidence_get_context`) and UI gating for sensitive full-text display.
+
+---
+
+## 2026-02-10 - Productization M2.1: Evidence chunk retrieval + context (backend + RPC)
+
+1) Done: what changed + why
+- Added evidence context retrieval in `qir_ai` so the UI can show “prev/next” chunks deterministically by ordinal within a source.
+- Added thin Tauri commands to fetch a full chunk by id (explicit user action only) and fetch a deterministic context window around a chunk.
+- Added schemas and unit tests to keep retrieval ordering stable and ensure unknown chunk IDs return a structured `AI_EVIDENCE_NOT_FOUND`.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/evidence/model.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/evidence/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/evidence/store.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/Cargo.toml
+- /Users/d/Projects/IncidentReview/crates/qir_ai/tests/evidence_context.rs
+- /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs
+- /Users/d/Projects/IncidentReview/src/lib/schemas.ts
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Full chunk text can include sensitive raw evidence (especially Slack). We will keep the UI default on snippet-only and require explicit user action before calling `ai_evidence_get_chunk` (M2.2).
+- Context currently loads chunks from disk to compute ordinals; for very large sources, we may need caching/indexing (covered in M4).
+
+5) Status: current phase + complete / in progress / blocked
+- Productization M2: in progress (backend + RPC complete; UI Evidence Viewer next).
+
+6) Next steps
+- Implement the Evidence Viewer UI: search -> results -> select citations -> reveal full chunk behind click -> show context prev/next in stable order.
+
+---
+
+## 2026-02-10 - Productization M2.2: Evidence Viewer UI (citation tray + reveal + context)
+
+1) Done: what changed + why
+- Reworked the AI evidence search into an “Evidence Viewer” UX:
+  - citation set tray with deterministic ordering and user-controlled reordering (Up/Down)
+  - snippet-first search results with explicit actions to add/remove citations
+  - explicit “Reveal full chunk” button that loads raw evidence text only on user action, with a warning banner
+  - “Show context” button that loads a stable prev/next window around a chunk
+- Wired provenance citations (“Open cited chunk”) to load context/reveal from within the same screen, avoiding string parsing and keeping chunk IDs as the only truth.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/src/features/ai/AiSection.tsx
+- /Users/d/Projects/IncidentReview/src/features/ai/AiSection.test.tsx
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Revealed chunk text may include sensitive raw evidence. The UI requires explicit user action before loading full text, but it is still user-accessible once loaded; consider a future “hide/re-mask” control if needed.
+- Evidence Viewer currently lives inside the AI section rather than a separate top-level navigation route; if this grows, consider promoting it to its own nav item (without changing backend logic).
+
+5) Status: current phase + complete / in progress / blocked
+- Productization M2: complete.
+
+6) Next steps
+- Begin M3: add additional draft sections with strict per-unit citation enforcement and validation tests.
+
+---
+
+## 2026-02-10 - Productization M3.1: Draft additional sections (backend + tests)
+
+1) Done: what changed + why
+- Extended `qir_ai` drafting beyond `exec_summary` with new section IDs:
+  - `incident_highlights_top_n`
+  - `theme_analysis`
+  - `action_plan_next_quarter`
+  - `quarter_narrative_recap`
+- Added strict per-unit citation enforcement:
+  - list sections: every bullet must contain an inline `[[chunk:<id>]]` marker
+  - narrative section: every paragraph must contain an inline `[[chunk:<id>]]` marker
+- Updated prompt templates and added tests validating the new enforcement behavior.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/draft/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/draft/prompts.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/tests/draft.rs
+- /Users/d/Projects/IncidentReview/src/lib/schemas.ts
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- The per-line/per-paragraph validators are intentionally strict and assume the model follows the prompt formatting. If models frequently wrap citations onto a second line, we may need a slightly more flexible validator that still preserves auditability.
+
+5) Status: current phase + complete / in progress / blocked
+- Productization M3: in progress (backend complete; UI support next).
+
+6) Next steps
+- Update the AI Draft UI to support selecting these new sections, while preserving citation set behavior and draft artifact persistence.
+
+---
+
+## 2026-02-10 - Productization M3.2: Draft UI supports multiple sections
+
+1) Done: what changed + why
+- Updated the AI Draft UI to support drafting additional report sections (beyond `exec_summary`) using the same evidence-first citation set.
+- Ensured persisted draft artifacts store the correct `section_type` matching the drafted section (no string matching; code-based contract only).
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/src/features/ai/AiSection.tsx
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- The UI does not yet provide section-specific structured editors (for example top-N input). Prompts are freeform by design; consider adding small, deterministic helpers later without moving any truth logic into the UI.
+
+5) Status: current phase + complete / in progress / blocked
+- Productization M3: complete.
+
+6) Next steps
+- Start M4: incremental indexing and storage split for large evidence stores while preserving deterministic retrieval ordering.
+
+---
+
+## 2026-02-10 - Productization M4.1: Storage split for retrieval (snippets/metadata vs full text)
+
+1) Done: what changed + why
+- Added per-chunk summary records in `qir_ai` evidence storage so retrieval and listing can use metadata + deterministic snippets without loading full chunk bodies.
+- Updated retrieval to:
+  - filter by `source_id` without reading full chunk JSON
+  - return deterministic snippets and citations from summaries
+- Kept full chunk text available only via the explicit chunk fetch endpoint (UI still requires user action).
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/evidence/store.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/retrieve/mod.rs
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Evidence store now writes additional summary files. Back-compat is handled by deriving summaries from existing chunk JSON on-demand, but older stores may take a one-time hit the first time summaries are needed.
+
+5) Status: current phase + complete / in progress / blocked
+- Productization M4: in progress (storage split for retrieval complete; incremental indexing + index status UI next).
+
+6) Next steps
+- Implement incremental index builds using per-chunk text hashes so only changed/new chunks are embedded.
+
+---
+
+## 2026-02-10 - Productization M4.2: Incremental indexing + index status UI
+
+1) Done: what changed + why
+- Implemented incremental index builds in `qir_ai`:
+  - persisted per-chunk text hashes (`text_sha256`) alongside vectors
+  - embeds only new/changed chunks, removes deleted chunks, and commits in stable order
+- Extended index status to include `chunks_total` and `source_id` for better auditability and UI reporting.
+- Updated the AI UI to display embedded count vs total chunk count and updated_at.
+- Added a unit test proving incremental behavior (second build does zero embedding calls; changing one chunk embeds once).
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/evidence/index.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/tests/index_build.rs
+- /Users/d/Projects/IncidentReview/src/lib/schemas.ts
+- /Users/d/Projects/IncidentReview/src/features/ai/AiSection.tsx
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Index compatibility is keyed on (model, source_id). If users switch models or build per-source, index rebuilds from scratch; this is intentional to avoid mixed-vector corruption.
+
+5) Status: current phase + complete / in progress / blocked
+- Productization M4: complete.
+
+6) Next steps
+- Start M5: About panel + build metadata + schema/migration safety prompts.
+
+---
+
+## 2026-02-10 - Productization M5: About panel + build metadata + startup migration guard
+
+1) Done: what changed + why
+- Added an in-app About panel (local-only metadata) so users can see app version, git commit hash (best-effort), current workspace path, and schema/migration status.
+- Implemented a startup migration guard: if the selected workspace DB has pending migrations, the app prompts the user to back up before continuing to migrate (no silent migrations at startup).
+- Persisted selected AI models (draft + embedding) in localStorage so the About panel can show “selected models” alongside the installed model list when Ollama is available.
+- Added a preflight-safe `app_info` Tauri command that reads migration metadata without applying migrations.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/src/App.tsx
+- /Users/d/Projects/IncidentReview/src/styles.css
+- /Users/d/Projects/IncidentReview/src/ui/Modal.tsx
+- /Users/d/Projects/IncidentReview/src/features/about/AboutSection.tsx
+- /Users/d/Projects/IncidentReview/src/features/about/AboutSection.test.tsx
+- /Users/d/Projects/IncidentReview/src/features/ai/AiSection.tsx
+- /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- The migration guard currently guides users to back up, but does not enforce that a backup exists; it’s an explicit user confirmation step.
+- Ollama model listing on this machine prints an MLX symbol warning before the list; the app itself uses HTTP calls to Ollama and does not depend on MLX, but it may confuse users if it appears in logs.
+
+5) Status: current phase + complete / in progress / blocked
+- Productization M5: complete.
+
+6) Next steps
+- Start M6: add explicit UI/docs messaging about keeping Ollama bound to 127.0.0.1 only, and expand URL validation regression tests in `qir_ai`.
+
+---
+
+## 2026-02-10 - Productization M6: Local Ollama security posture hardening
+
+1) Done: what changed + why
+- Expanded localhost-only URL validation regression tests for `qir_ai` so common bypass attempts (userinfo, query/fragment, malformed ports, scheme casing) are rejected deterministically.
+- Added explicit UI messaging in the AI screen and About panel plus README documentation reminding users not to expose Ollama to the network.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/lib.rs
+- /Users/d/Projects/IncidentReview/src/features/ai/AiSection.tsx
+- /Users/d/Projects/IncidentReview/README.md
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- None identified for M6; enforcement remains strict and is now more thoroughly regression-tested.
+
+5) Status: current phase + complete / in progress / blocked
+- Productization M6: complete.
+
+6) Next steps
+- If we want to make the migration guard more “backup-first” in-app, consider adding a pre-migration “copy DB file” helper (still local-only) without applying migrations.

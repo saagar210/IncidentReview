@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::evidence::{Citation, EvidenceStore};
 use crate::guardrails::enforce_citations;
 use crate::llm::Llm;
+use sha2::{Digest, Sha256};
 
 mod prompts;
 
@@ -11,6 +12,10 @@ mod prompts;
 #[serde(rename_all = "snake_case")]
 pub enum SectionId {
     ExecSummary,
+    IncidentHighlightsTopN,
+    ThemeAnalysis,
+    ActionPlanNextQuarter,
+    QuarterNarrativeRecap,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,6 +31,9 @@ pub struct AiDraftResponse {
     pub section_id: SectionId,
     pub markdown: String,
     pub citations: Vec<Citation>,
+    pub model_name: String,
+    pub model_params_hash: String,
+    pub prompt_template_version: String,
 }
 
 pub fn draft_section_with_llm(
@@ -64,12 +72,40 @@ pub fn draft_section_with_llm(
             &req.prompt,
             &evidence_blocks,
         ),
+        SectionId::IncidentHighlightsTopN => prompts::incident_highlights_top_n_prompt(
+            &req.quarter_label,
+            &req.prompt,
+            &evidence_blocks,
+        ),
+        SectionId::ThemeAnalysis => prompts::theme_analysis_prompt(
+            &req.quarter_label,
+            &req.prompt,
+            &evidence_blocks,
+        ),
+        SectionId::ActionPlanNextQuarter => prompts::action_plan_next_quarter_prompt(
+            &req.quarter_label,
+            &req.prompt,
+            &evidence_blocks,
+        ),
+        SectionId::QuarterNarrativeRecap => prompts::quarter_narrative_recap_prompt(
+            &req.quarter_label,
+            &req.prompt,
+            &evidence_blocks,
+        ),
     };
+
+    let prompt_template_version = match req.section_id {
+        SectionId::ExecSummary => "exec_summary_v1".to_string(),
+        SectionId::IncidentHighlightsTopN => "incident_highlights_top_n_v1".to_string(),
+        SectionId::ThemeAnalysis => "theme_analysis_v1".to_string(),
+        SectionId::ActionPlanNextQuarter => "action_plan_next_quarter_v1".to_string(),
+        SectionId::QuarterNarrativeRecap => "quarter_narrative_recap_v1".to_string(),
+    };
+    let model_params_hash = compute_model_params_hash(model)?;
 
     let markdown = llm.generate(model, &prompt)?;
 
-    // Guardrails: require at least one citation marker in output.
-    enforce_citations(&markdown).map_err(|e| {
+    validate_section_citations(req.section_id.clone(), &markdown).map_err(|e| {
         AppError::new("AI_CITATION_REQUIRED", "Draft missing citations")
             .with_details(e.to_string())
     })?;
@@ -108,7 +144,66 @@ pub fn draft_section_with_llm(
         section_id: req.section_id,
         markdown,
         citations: out_citations,
+        model_name: model.to_string(),
+        model_params_hash,
+        prompt_template_version,
     })
+}
+
+fn validate_section_citations(section_id: SectionId, markdown: &str) -> Result<(), AppError> {
+    // Always require at least one citation marker somewhere.
+    enforce_citations(markdown)?;
+
+    match section_id {
+        SectionId::ExecSummary => Ok(()),
+        SectionId::IncidentHighlightsTopN | SectionId::ThemeAnalysis | SectionId::ActionPlanNextQuarter => {
+            validate_each_list_item_has_citation(markdown)
+        }
+        SectionId::QuarterNarrativeRecap => validate_each_paragraph_has_citation(markdown),
+    }
+}
+
+fn validate_each_list_item_has_citation(markdown: &str) -> Result<(), AppError> {
+    let mut missing: Vec<usize> = Vec::new();
+    for (idx, line) in markdown.lines().enumerate() {
+        let t = line.trim_start();
+        if t.starts_with("- ") || t.starts_with("* ") {
+            if !t.contains("[[chunk:") {
+                missing.push(idx + 1);
+            }
+        }
+    }
+    if missing.is_empty() {
+        return Ok(());
+    }
+    Err(AppError::new(
+        "AI_CITATION_REQUIRED",
+        "Each list item must include at least one citation marker",
+    )
+    .with_details(format!("missing_citation_lines={missing:?}")))
+}
+
+fn validate_each_paragraph_has_citation(markdown: &str) -> Result<(), AppError> {
+    let mut missing: Vec<usize> = Vec::new();
+    // Split on blank lines; each paragraph must cite.
+    let paras = markdown.split("\n\n").collect::<Vec<_>>();
+    for (idx, p) in paras.iter().enumerate() {
+        let t = p.trim();
+        if t.is_empty() {
+            continue;
+        }
+        if !t.contains("[[chunk:") {
+            missing.push(idx + 1);
+        }
+    }
+    if missing.is_empty() {
+        return Ok(());
+    }
+    Err(AppError::new(
+        "AI_CITATION_REQUIRED",
+        "Each paragraph must include at least one citation marker",
+    )
+    .with_details(format!("missing_citation_paragraphs={missing:?}")))
 }
 
 fn build_evidence_blocks(evidence: &EvidenceStore, chunk_ids: &[String]) -> Result<String, AppError> {
@@ -150,3 +245,26 @@ fn extract_cited_chunk_ids(markdown: &str) -> std::collections::BTreeSet<String>
     out
 }
 
+fn compute_model_params_hash(model: &str) -> Result<String, AppError> {
+    // Minimal stable hash of the generation parameters that affect output.
+    // Currently: model + stream=false (no other params exposed yet).
+    #[derive(Serialize)]
+    struct Params<'a> {
+        v: u32,
+        api: &'a str,
+        model: &'a str,
+        stream: bool,
+    }
+    let p = Params {
+        v: 1,
+        api: "/api/generate",
+        model,
+        stream: false,
+    };
+    let json = serde_json::to_string(&p).map_err(|e| {
+        AppError::new("AI_DRAFT_FAILED", "Failed to encode model params for hashing")
+            .with_details(e.to_string())
+    })?;
+    let digest = Sha256::digest(json.as_bytes());
+    Ok(hex::encode(digest))
+}

@@ -86,8 +86,8 @@ pub fn query_with_embedder(
         }
 
         if let Some(filter) = source_filter {
-            let chunk = evidence.get_chunk(chunk_id)?;
-            if !filter.iter().any(|sid| sid == &chunk.source_id) {
+            let summary = evidence.get_chunk_summary(chunk_id)?;
+            if !filter.iter().any(|sid| sid == &summary.source_id) {
                 continue;
             }
         }
@@ -109,27 +109,16 @@ pub fn query_with_embedder(
 
     let mut out: Vec<EvidenceQueryHit> = Vec::new();
     for (chunk_id, score) in hits {
-        let chunk = evidence.get_chunk(&chunk_id)?;
-        let snippet = snippet_first_chars(&chunk.text, 280);
+        let summary = evidence.get_chunk_summary(&chunk_id)?;
+        let snippet = evidence.get_chunk_snippet(&chunk_id)?;
         out.push(EvidenceQueryHit {
-            chunk_id: chunk.chunk_id.clone(),
-            source_id: chunk.source_id.clone(),
+            chunk_id: summary.chunk_id.clone(),
+            source_id: summary.source_id.clone(),
             score,
             snippet,
-            citation: evidence.citation_for_chunk(&chunk),
+            citation: evidence.citation_for_summary(&summary),
         });
     }
 
     Ok(EvidenceQueryResponse { hits: out })
 }
-
-fn snippet_first_chars(text: &str, max_chars: usize) -> String {
-    let t = text.trim();
-    if t.len() <= max_chars {
-        return t.to_string();
-    }
-    let mut s = t[..max_chars].to_string();
-    s.push_str("...");
-    s
-}
-

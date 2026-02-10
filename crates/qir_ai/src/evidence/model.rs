@@ -62,6 +62,13 @@ pub struct EvidenceChunkSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct EvidenceContextResponse {
+    pub center_chunk_id: String,
+    pub chunks: Vec<EvidenceChunkSummary>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CitationLocator {
     pub source_id: String,
     pub ordinal: u32,
@@ -74,4 +81,3 @@ pub struct Citation {
     pub chunk_id: String,
     pub locator: CitationLocator,
 }
-

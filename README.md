@@ -178,6 +178,8 @@ pnpm tauri build
 IncidentReview will only call:
 - `http://127.0.0.1:<ollama_port>/...`
 
+Security note: do not configure Ollama to listen on non-loopback interfaces (for example `0.0.0.0`) and do not expose it to the network. IncidentReview enforces loopback-only endpoints.
+
 If Ollama is not running, AI features are disabled and the app remains fully functional.
 
 ---

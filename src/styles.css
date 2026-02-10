@@ -420,3 +420,54 @@ body {
   font-weight: 700;
   color: rgba(255, 255, 255, 0.86);
 }
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 9500;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 18px;
+}
+
+.modal {
+  width: min(720px, 94vw);
+  max-height: min(82vh, 880px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(11, 15, 23, 0.98), rgba(7, 9, 17, 0.98));
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.35);
+  padding: 14px;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.modalTitle {
+  margin-top: 4px;
+  font-weight: 750;
+  font-size: 14px;
+}
+
+.modalBody {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.modalFooter {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}

@@ -9,6 +9,8 @@ describe("AiSection", () => {
     expect(html).toContain("AI (Phase 5)");
     expect(html).toContain("Add Evidence Source");
     expect(html).toContain("Build Chunks");
+    expect(html).toContain("Store AI drafts locally");
+    expect(html).toContain("Draft Artifacts (History / Provenance)");
+    expect(html).toContain("Evidence Viewer");
   });
 });
-

@@ -5,7 +5,8 @@ use std::path::PathBuf;
 use qir_ai::ollama::{OllamaClient, OllamaModelInfo};
 use qir_ai::evidence::{
     BuildChunksResult as AiBuildChunksResult, EvidenceAddSourceInput as AiEvidenceAddSourceInput,
-    EvidenceChunkSummary as AiEvidenceChunkSummary, EvidenceOrigin as AiEvidenceOrigin,
+    EvidenceChunk as AiEvidenceChunk, EvidenceChunkSummary as AiEvidenceChunkSummary,
+    EvidenceContextResponse as AiEvidenceContextResponse, EvidenceOrigin as AiEvidenceOrigin,
     EvidenceQueryStore as AiEvidenceQueryStore, EvidenceSource as AiEvidenceSource,
     EvidenceSourceType as AiEvidenceSourceType, EvidenceStore as AiEvidenceStore,
     AiIndexBuildInput as AiIndexBuildInput, AiIndexStatus as AiIndexStatus, IndexStore as AiIndexStore,
@@ -35,6 +36,7 @@ use qir_core::sanitize::{
 };
 use qir_core::validate::{validate_all_incidents, IncidentValidationReportItem};
 use qir_core::workspace::WorkspaceMetadata;
+use qir_core::ai_drafts::{AiDraftArtifact, AiDraftSectionType, CreateAiDraftInput};
 use tauri::Manager;
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
@@ -50,6 +52,24 @@ pub struct InitDbResponse {
 }
 
 #[derive(Debug, serde::Serialize)]
+pub struct AppInfo {
+    pub app_version: String,
+    pub git_commit_hash: Option<String>,
+    pub current_db_path: String,
+    pub latest_migration: String,
+    pub applied_migrations: Vec<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceMigrationStatus {
+    pub db_path: String,
+    pub latest_migration: String,
+    pub applied_migrations: Vec<String>,
+    pub pending_migrations: Vec<String>,
+}
+
+#[derive(Debug, serde::Serialize)]
 pub struct AiHealthStatus {
     pub ok: bool,
     pub message: String,
@@ -61,6 +81,31 @@ pub struct AiModelInfo {
     pub size: Option<u64>,
     pub digest: Option<String>,
     pub modified_at: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiDraftCreateRequest {
+    pub quarter_label: String,
+    pub section_type: String,
+    pub draft_text: String,
+    pub citation_chunk_ids: Vec<String>,
+    pub model_name: String,
+    pub model_params_hash: String,
+    pub prompt_template_version: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiDraftListRequest {
+    pub quarter_label: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiEvidenceContextRequest {
+    pub chunk_id: String,
+    pub window: u32,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -262,6 +307,52 @@ fn init_db(app: tauri::AppHandle) -> Result<InitDbResponse, AppError> {
     };
     Ok(InitDbResponse {
         db_path: db_path.to_string_lossy().to_string(),
+    })
+}
+
+#[tauri::command]
+fn app_info(app: tauri::AppHandle) -> Result<AppInfo, AppError> {
+    let state = app.state::<WorkspaceState>();
+    let db_path = resolve_current_db_path(&app, &state)?;
+    // Preflight-safe: do not apply migrations when reading About metadata.
+    let applied = if db_path.exists() {
+        let conn = qir_core::db::open(db_path.as_path())?;
+        qir_core::db::applied_migration_names(&conn)?
+    } else {
+        Vec::new()
+    };
+    let latest = qir_core::db::latest_migration_name().to_string();
+    Ok(AppInfo {
+        app_version: env!("CARGO_PKG_VERSION").to_string(),
+        git_commit_hash: option_env!("GIT_COMMIT_HASH").map(|s| s.to_string()),
+        current_db_path: db_path.to_string_lossy().to_string(),
+        latest_migration: latest,
+        applied_migrations: applied,
+    })
+}
+
+#[tauri::command]
+fn workspace_migration_status(db_path: String) -> Result<WorkspaceMigrationStatus, AppError> {
+    let db_path = PathBuf::from(db_path);
+    if !db_path.exists() {
+        return Err(AppError::new(
+            "WORKSPACE_DB_NOT_FOUND",
+            "Workspace database file not found",
+        )
+        .with_details(db_path.display().to_string()));
+    }
+    let conn = qir_core::db::open(db_path.as_path()).map_err(|e| {
+        let details = e.details.clone().unwrap_or_else(|| e.to_string());
+        AppError::new("WORKSPACE_OPEN_FAILED", "Failed to open workspace database")
+            .with_details(details)
+    })?;
+    let applied = qir_core::db::applied_migration_names(&conn)?;
+    let pending = qir_core::db::pending_migration_names(&conn)?;
+    Ok(WorkspaceMigrationStatus {
+        db_path: db_path.to_string_lossy().to_string(),
+        latest_migration: qir_core::db::latest_migration_name().to_string(),
+        applied_migrations: applied,
+        pending_migrations: pending,
     })
 }
 
@@ -582,6 +673,23 @@ fn ai_evidence_list_chunks(
 }
 
 #[tauri::command]
+fn ai_evidence_get_chunk(app: tauri::AppHandle, chunk_id: String) -> Result<AiEvidenceChunk, AppError> {
+    let root = ai_store_root(&app)?;
+    let store = AiEvidenceStore::open(root);
+    store.get_chunk(&chunk_id)
+}
+
+#[tauri::command]
+fn ai_evidence_get_context(
+    app: tauri::AppHandle,
+    req: AiEvidenceContextRequest,
+) -> Result<AiEvidenceContextResponse, AppError> {
+    let root = ai_store_root(&app)?;
+    let store = AiEvidenceStore::open(root);
+    store.get_context(&req.chunk_id, req.window)
+}
+
+#[tauri::command]
 fn ai_index_status(app: tauri::AppHandle) -> Result<AiIndexStatus, AppError> {
     let root = ai_store_root(&app)?;
     let index = AiIndexStore::open(root);
@@ -645,6 +753,45 @@ fn ai_draft_section(
             citation_chunk_ids: req.citation_chunk_ids,
         },
     )
+}
+
+#[tauri::command]
+fn ai_drafts_create(app: tauri::AppHandle, req: AiDraftCreateRequest) -> Result<AiDraftArtifact, AppError> {
+    let state = app.state::<WorkspaceState>();
+    let conn = open_current_workspace_conn(&app, &state)?;
+    let created_at = now_rfc3339_utc()?;
+    let section_type = AiDraftSectionType::from_str(&req.section_type).ok_or_else(|| {
+        AppError::new("DB_AI_DRAFT_INVALID", "Invalid section_type for AI draft")
+            .with_details(req.section_type.clone())
+    })?;
+
+    qir_core::ai_drafts::create_ai_draft(
+        &conn,
+        CreateAiDraftInput {
+            quarter_label: req.quarter_label,
+            section_type,
+            draft_text: req.draft_text,
+            citation_chunk_ids: req.citation_chunk_ids,
+            model_name: req.model_name,
+            model_params_hash: req.model_params_hash,
+            prompt_template_version: req.prompt_template_version,
+            created_at,
+        },
+    )
+}
+
+#[tauri::command]
+fn ai_drafts_list(app: tauri::AppHandle, req: AiDraftListRequest) -> Result<Vec<AiDraftArtifact>, AppError> {
+    let state = app.state::<WorkspaceState>();
+    let conn = open_current_workspace_conn(&app, &state)?;
+    qir_core::ai_drafts::list_ai_drafts(&conn, req.quarter_label.as_deref())
+}
+
+#[tauri::command]
+fn ai_drafts_get(app: tauri::AppHandle, id: i64) -> Result<Option<AiDraftArtifact>, AppError> {
+    let state = app.state::<WorkspaceState>();
+    let conn = open_current_workspace_conn(&app, &state)?;
+    qir_core::ai_drafts::get_ai_draft(&conn, id)
 }
 
 #[tauri::command]
@@ -756,6 +903,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             init_db,
+            app_info,
+            workspace_migration_status,
             workspace_get_current,
             workspace_open,
             workspace_create,
@@ -780,10 +929,15 @@ pub fn run() {
             ai_evidence_list_sources,
             ai_evidence_build_chunks,
             ai_evidence_list_chunks,
+            ai_evidence_get_chunk,
+            ai_evidence_get_context,
             ai_index_status,
             ai_index_build,
             ai_evidence_query,
             ai_draft_section,
+            ai_drafts_create,
+            ai_drafts_list,
+            ai_drafts_get,
             backup_create,
             backup_inspect,
             restore_from_backup,

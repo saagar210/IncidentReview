@@ -21,6 +21,7 @@ mod tests {
         assert!(OllamaClient::new("http://0.0.0.0:11434").is_err());
         assert!(OllamaClient::new("http://[::1]:11434").is_err());
         assert!(OllamaClient::new("https://example.com").is_err());
+        assert!(OllamaClient::new("HTTP://127.0.0.1:11434").is_err());
 
         // Harden against prefix-based bypasses.
         assert!(OllamaClient::new("http://127.0.0.1.evil.com:11434").is_err());
@@ -30,6 +31,11 @@ mod tests {
         assert!(OllamaClient::new("http://127.0.0.1:99999").is_err());
         assert!(OllamaClient::new("http://127.0.0.1:11434/").is_ok()); // trailing slash is trimmed
         assert!(OllamaClient::new("http://127.0.0.1:11434/api").is_err());
+        assert!(OllamaClient::new("http://127.0.0.1:11434?x=1").is_err());
+        assert!(OllamaClient::new("http://127.0.0.1:11434#frag").is_err());
+        assert!(OllamaClient::new("http://127.0.0.1:11434@evil.com").is_err());
+        assert!(OllamaClient::new("http://127.0.0.1:11434:123").is_err());
+        assert!(OllamaClient::new("http://127.0.0.1%0a:11434").is_err());
     }
 
     #[test]

@@ -86,7 +86,13 @@ These are required by `AGENTS.md`:
 - Phase 5 DS4 is complete: drafting with mandatory citations (hard fail if missing/invalid).
 - Phase 5 DS5 is complete: UI gating flow + AI Draft screen (end-to-end UX).
 - Phase 5 is now shippable end-to-end: evidence -> chunks -> embeddings index -> retrieval -> citation-enforced drafting (local-only via Ollama on 127.0.0.1).
-- Phase 5.1 is in progress: list installed Ollama models + allow selecting draft/embedding models (remove hardcoded defaults).
+- Phase 5.1 is complete: list installed Ollama models + allow selecting draft/embedding models (remove hardcoded defaults).
+- Productization M1 is complete: AI draft artifacts + provenance/audit trail (persisted in qir_core, with UI history and provenance panels).
+- Productization M2 is complete: Evidence Viewer UX (search + citation tray + full chunk behind click + context navigation).
+- Productization M3 is complete: draft additional report sections with strict per-unit citation enforcement.
+- Productization M4 is complete: scalability/performance for large evidence stores (incremental indexing, storage split, stable retrieval).
+- Productization M5 is complete: release packaging + upgrade safety (About panel + build metadata + startup migration guard that prompts for backup before migrating an older workspace DB).
+- Productization M6 is complete: local Ollama security posture hardening (UI/docs messaging + expanded URL validation regression tests).
 - Deliverable Set 1 is complete: Jira CSV import UX + mapping profile CRUD + profile-based import with inserted/updated/skipped + warnings + conflict surfacing.
 - Deliverable Set 2 is complete: Slack ingest UX + deterministic timestamp normalization contract (raw preservation) + Validation/Anomalies UI baseline.
 - Deliverable Set 3 is complete: dashboards expansion (Detection/Response/Vendor-Service) + deterministic QIR report v1 + incident drill-down detail UX.

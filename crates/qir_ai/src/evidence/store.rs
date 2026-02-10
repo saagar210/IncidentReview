@@ -8,8 +8,8 @@ use sha2::{Digest, Sha256};
 
 use super::chunking::{build_chunks_for_source, ChunkDraft};
 use super::model::{
-    Citation, CitationLocator, EvidenceChunk, EvidenceChunkSummary, EvidenceOrigin,
-    EvidenceSource, EvidenceSourceType,
+    Citation, CitationLocator, EvidenceChunk, EvidenceChunkSummary, EvidenceContextResponse,
+    EvidenceOrigin, EvidenceSource, EvidenceSourceType,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,6 +47,12 @@ pub struct EvidenceStore {
     root: PathBuf,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct EvidenceChunkSummaryRecord {
+    pub summary: EvidenceChunkSummary,
+    pub snippet: String,
+}
+
 impl EvidenceStore {
     pub fn open(root: PathBuf) -> Self {
         Self { root }
@@ -66,6 +72,10 @@ impl EvidenceStore {
 
     fn chunks_dir(&self) -> PathBuf {
         self.root.join("chunks")
+    }
+
+    fn chunk_summaries_dir(&self) -> PathBuf {
+        self.root.join("chunk_summaries")
     }
 
     fn chunks_by_source_path(&self) -> PathBuf {
@@ -93,6 +103,17 @@ impl EvidenceStore {
                 "Failed to create evidence chunks directory",
             )
             .with_details(format!("path={}; err={}", self.chunks_dir().display(), e))
+        })?;
+        fs::create_dir_all(self.chunk_summaries_dir()).map_err(|e| {
+            AppError::new(
+                "AI_EVIDENCE_STORE_FAILED",
+                "Failed to create evidence chunk summaries directory",
+            )
+            .with_details(format!(
+                "path={}; err={}",
+                self.chunk_summaries_dir().display(),
+                e
+            ))
         })?;
         Ok(())
     }
@@ -283,6 +304,10 @@ impl EvidenceStore {
         self.chunks_dir().join(format!("{chunk_id}.json"))
     }
 
+    fn chunk_summary_path(&self, chunk_id: &str) -> PathBuf {
+        self.chunk_summaries_dir().join(format!("{chunk_id}.json"))
+    }
+
     fn write_chunk(&self, chunk: &EvidenceChunk) -> Result<(), AppError> {
         let path = self.chunk_path(&chunk.chunk_id);
         let json = serde_json::to_string_pretty(chunk).map_err(|e| {
@@ -291,6 +316,31 @@ impl EvidenceStore {
         })?;
         fs::write(&path, json.as_bytes()).map_err(|e| {
             AppError::new("AI_EVIDENCE_STORE_FAILED", "Failed to write evidence chunk")
+                .with_details(format!("path={}; err={}", path.display(), e))
+        })?;
+        Ok(())
+    }
+
+    fn write_chunk_summary(&self, chunk: &EvidenceChunk) -> Result<(), AppError> {
+        let path = self.chunk_summary_path(&chunk.chunk_id);
+        let summary = EvidenceChunkSummary {
+            chunk_id: chunk.chunk_id.clone(),
+            source_id: chunk.source_id.clone(),
+            ordinal: chunk.ordinal,
+            text_sha256: chunk.text_sha256.clone(),
+            token_count_est: chunk.token_count_est,
+            meta: chunk.meta.clone(),
+        };
+        let rec = EvidenceChunkSummaryRecord {
+            summary,
+            snippet: snippet_first_chars(&chunk.text, 280),
+        };
+        let json = serde_json::to_string_pretty(&rec).map_err(|e| {
+            AppError::new("AI_EVIDENCE_STORE_FAILED", "Failed to encode evidence chunk summary")
+                .with_details(e.to_string())
+        })?;
+        fs::write(&path, json.as_bytes()).map_err(|e| {
+            AppError::new("AI_EVIDENCE_STORE_FAILED", "Failed to write evidence chunk summary")
                 .with_details(format!("path={}; err={}", path.display(), e))
         })?;
         Ok(())
@@ -309,6 +359,101 @@ impl EvidenceStore {
         })
     }
 
+    fn get_chunk_summary_record(&self, chunk_id: &str) -> Result<EvidenceChunkSummaryRecord, AppError> {
+        self.ensure_dirs()?;
+        let path = self.chunk_summary_path(chunk_id);
+        if path.exists() {
+            let raw = fs::read_to_string(&path).map_err(|e| {
+                AppError::new("AI_EVIDENCE_STORE_FAILED", "Failed to read evidence chunk summary")
+                    .with_details(format!("id={chunk_id}; err={e}"))
+            })?;
+            return serde_json::from_str(&raw).map_err(|e| {
+                AppError::new("AI_EVIDENCE_STORE_FAILED", "Failed to decode evidence chunk summary")
+                    .with_details(format!("path={}; err={}", path.display(), e))
+            });
+        }
+
+        // Back-compat: if summaries haven't been written yet, derive deterministically from the chunk file.
+        let chunk = self.get_chunk(chunk_id)?;
+        self.write_chunk_summary(&chunk)?;
+        Ok(EvidenceChunkSummaryRecord {
+            summary: EvidenceChunkSummary {
+                chunk_id: chunk.chunk_id,
+                source_id: chunk.source_id,
+                ordinal: chunk.ordinal,
+                text_sha256: chunk.text_sha256,
+                token_count_est: chunk.token_count_est,
+                meta: chunk.meta,
+            },
+            snippet: snippet_first_chars(&chunk.text, 280),
+        })
+    }
+
+    pub fn get_chunk_summary(&self, chunk_id: &str) -> Result<EvidenceChunkSummary, AppError> {
+        Ok(self.get_chunk_summary_record(chunk_id)?.summary)
+    }
+
+    pub fn get_chunk_snippet(&self, chunk_id: &str) -> Result<String, AppError> {
+        Ok(self.get_chunk_summary_record(chunk_id)?.snippet)
+    }
+
+    pub fn get_context(&self, chunk_id: &str, window: u32) -> Result<EvidenceContextResponse, AppError> {
+        self.ensure_dirs()?;
+        if window > 50 {
+            return Err(AppError::new(
+                "AI_EVIDENCE_CONTEXT_INVALID",
+                "Context window too large",
+            )
+            .with_details(format!("window={window}")));
+        }
+
+        let center_rec = self.get_chunk_summary_record(chunk_id)?;
+        let center = center_rec.summary;
+        let map = self.read_chunks_by_source()?;
+        let ids = map.get(&center.source_id).ok_or_else(|| {
+            AppError::new("AI_EVIDENCE_NOT_FOUND", "Evidence chunk not found")
+                .with_details(format!("id={chunk_id}; source_id={}", center.source_id))
+        })?;
+
+        let mut ordered: Vec<(u32, String)> = Vec::new();
+        for cid in ids {
+            let rec = self.get_chunk_summary_record(cid)?;
+            ordered.push((rec.summary.ordinal, rec.summary.chunk_id));
+        }
+        ordered.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+
+        let pos = ordered
+            .iter()
+            .position(|(_, id)| id.as_str() == chunk_id)
+            .ok_or_else(|| {
+                AppError::new("AI_EVIDENCE_NOT_FOUND", "Evidence chunk not found")
+                    .with_details(format!("id={chunk_id}; source_id={}", center.source_id))
+            })?;
+
+        let w = window as usize;
+        let start = pos.saturating_sub(w);
+        let end = std::cmp::min(ordered.len(), pos + w + 1);
+
+        let mut chunks: Vec<EvidenceChunkSummary> = Vec::new();
+        for (_, cid) in ordered[start..end].iter() {
+            let rec = self.get_chunk_summary_record(cid)?;
+            chunks.push(rec.summary);
+        }
+
+        // Stable ordering: source_id asc, ordinal asc, chunk_id asc.
+        chunks.sort_by(|a, b| {
+            a.source_id
+                .cmp(&b.source_id)
+                .then(a.ordinal.cmp(&b.ordinal))
+                .then(a.chunk_id.cmp(&b.chunk_id))
+        });
+
+        Ok(EvidenceContextResponse {
+            center_chunk_id: center.chunk_id,
+            chunks,
+        })
+    }
+
     fn delete_chunks(&self, chunk_ids: &[String]) -> Result<(), AppError> {
         for id in chunk_ids {
             let path = self.chunk_path(id);
@@ -316,6 +461,13 @@ impl EvidenceStore {
                 fs::remove_file(&path).map_err(|e| {
                     AppError::new("AI_EVIDENCE_STORE_FAILED", "Failed to delete chunk file")
                         .with_details(format!("path={}; err={}", path.display(), e))
+                })?;
+            }
+            let spath = self.chunk_summary_path(id);
+            if spath.exists() {
+                fs::remove_file(&spath).map_err(|e| {
+                    AppError::new("AI_EVIDENCE_STORE_FAILED", "Failed to delete chunk summary file")
+                        .with_details(format!("path={}; err={}", spath.display(), e))
                 })?;
             }
         }
@@ -380,6 +532,7 @@ impl EvidenceStore {
             for d in drafts {
                 let chunk = self.chunk_from_draft(&rec.source.source_id, d)?;
                 self.write_chunk(&chunk)?;
+                self.write_chunk_summary(&chunk)?;
                 chunk_ids.push(chunk.chunk_id);
                 total += 1;
             }
@@ -442,16 +595,8 @@ impl EvidenceStore {
                 None => continue,
             };
             for cid in ids {
-                let chunk = self.get_chunk(&cid)?;
-                let summary = EvidenceChunkSummary {
-                    chunk_id: chunk.chunk_id,
-                    source_id: chunk.source_id,
-                    ordinal: chunk.ordinal,
-                    text_sha256: chunk.text_sha256,
-                    token_count_est: chunk.token_count_est,
-                    meta: chunk.meta,
-                };
-                out.push(summary);
+                let rec = self.get_chunk_summary_record(&cid)?;
+                out.push(rec.summary);
             }
         }
 
@@ -467,6 +612,18 @@ impl EvidenceStore {
     }
 
     pub fn citation_for_chunk(&self, chunk: &EvidenceChunk) -> Citation {
+        Citation {
+            chunk_id: chunk.chunk_id.clone(),
+            locator: CitationLocator {
+                source_id: chunk.source_id.clone(),
+                ordinal: chunk.ordinal,
+                text_sha256: chunk.text_sha256.clone(),
+                char_range: None,
+            },
+        }
+    }
+
+    pub fn citation_for_summary(&self, chunk: &EvidenceChunkSummary) -> Citation {
         Citation {
             chunk_id: chunk.chunk_id.clone(),
             locator: CitationLocator {
@@ -536,6 +693,16 @@ impl EvidenceStore {
 
 pub(crate) fn normalize_text(s: &str) -> String {
     s.replace("\r\n", "\n").replace('\r', "\n")
+}
+
+fn snippet_first_chars(text: &str, max_chars: usize) -> String {
+    let t = text.trim();
+    if t.len() <= max_chars {
+        return t.to_string();
+    }
+    let mut s = t[..max_chars].to_string();
+    s.push_str("...");
+    s
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {

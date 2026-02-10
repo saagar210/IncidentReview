@@ -15,6 +15,10 @@ pub struct AiIndexStatus {
     pub model: Option<String>,
     pub dims: Option<u32>,
     pub chunk_count: u32,
+    #[serde(default)]
+    pub chunks_total: u32,
+    #[serde(default)]
+    pub source_id: Option<String>,
     pub updated_at: Option<String>,
 }
 
@@ -47,6 +51,10 @@ impl IndexStore {
         self.index_dir().join("index_vectors.json")
     }
 
+    fn hashes_path(&self) -> PathBuf {
+        self.index_dir().join("index_hashes.json")
+    }
+
     fn ensure_dirs(&self) -> Result<(), AppError> {
         fs::create_dir_all(self.index_dir()).map_err(|e| {
             AppError::new("AI_INDEX_BUILD_FAILED", "Failed to create index directory")
@@ -63,6 +71,8 @@ impl IndexStore {
                 model: None,
                 dims: None,
                 chunk_count: 0,
+                chunks_total: 0,
+                source_id: None,
                 updated_at: None,
             });
         }
@@ -114,6 +124,25 @@ impl IndexStore {
         Ok(())
     }
 
+    fn write_hashes(&self, map: &BTreeMap<String, String>) -> Result<(), AppError> {
+        self.ensure_dirs()?;
+        let path = self.hashes_path();
+        let tmp = path.with_extension("tmp");
+        let json = serde_json::to_string_pretty(map).map_err(|e| {
+            AppError::new("AI_INDEX_BUILD_FAILED", "Failed to encode index hashes")
+                .with_details(e.to_string())
+        })?;
+        fs::write(&tmp, json.as_bytes()).map_err(|e| {
+            AppError::new("AI_INDEX_BUILD_FAILED", "Failed to write index hashes")
+                .with_details(format!("path={}; err={}", tmp.display(), e))
+        })?;
+        fs::rename(&tmp, &path).map_err(|e| {
+            AppError::new("AI_INDEX_BUILD_FAILED", "Failed to finalize index hashes write")
+                .with_details(format!("tmp={}; dest={}; err={}", tmp.display(), path.display(), e))
+        })?;
+        Ok(())
+    }
+
     pub fn read_vectors(&self) -> Result<BTreeMap<String, Vec<f32>>, AppError> {
         self.ensure_dirs()?;
         let path = self.vectors_path();
@@ -126,6 +155,22 @@ impl IndexStore {
         })?;
         serde_json::from_slice(&bytes).map_err(|e| {
             AppError::new("AI_INDEX_BUILD_FAILED", "Failed to decode index vectors")
+                .with_details(format!("path={}; err={}", path.display(), e))
+        })
+    }
+
+    pub fn read_hashes(&self) -> Result<BTreeMap<String, String>, AppError> {
+        self.ensure_dirs()?;
+        let path = self.hashes_path();
+        if !path.exists() {
+            return Ok(BTreeMap::new());
+        }
+        let bytes = fs::read(&path).map_err(|e| {
+            AppError::new("AI_INDEX_BUILD_FAILED", "Failed to read index hashes")
+                .with_details(format!("path={}; err={}", path.display(), e))
+        })?;
+        serde_json::from_slice(&bytes).map_err(|e| {
+            AppError::new("AI_INDEX_BUILD_FAILED", "Failed to decode index hashes")
                 .with_details(format!("path={}; err={}", path.display(), e))
         })
     }
@@ -156,10 +201,41 @@ impl IndexStore {
             .collect::<Vec<_>>();
         ids.sort();
 
-        let mut vectors: BTreeMap<String, Vec<f32>> = BTreeMap::new();
-        let mut dims: Option<u32> = None;
+        let mut current = self.status()?;
+        let compatible = current.ready
+            && current.model.as_deref() == Some(input.model.as_str())
+            && current.source_id == input.source_id;
 
-        for chunk_id in ids.iter() {
+        let mut vectors: BTreeMap<String, Vec<f32>> = if compatible {
+            self.read_vectors()?
+        } else {
+            BTreeMap::new()
+        };
+        let mut hashes: BTreeMap<String, String> = if compatible {
+            self.read_hashes()?
+        } else {
+            BTreeMap::new()
+        };
+
+        // Remove any vectors/hashes for chunks no longer present.
+        let wanted: std::collections::BTreeSet<String> = ids.iter().cloned().collect();
+        vectors.retain(|k, _| wanted.contains(k));
+        hashes.retain(|k, _| wanted.contains(k));
+
+        let mut to_embed: Vec<String> = Vec::new();
+        for s in chunk_summaries.iter() {
+            let existing_hash = hashes.get(&s.chunk_id);
+            let has_vec = vectors.contains_key(&s.chunk_id);
+            if existing_hash != Some(&s.text_sha256) || !has_vec {
+                to_embed.push(s.chunk_id.clone());
+            }
+        }
+        to_embed.sort();
+        to_embed.dedup();
+
+        let mut dims: Option<u32> = if compatible { current.dims } else { None };
+
+        for chunk_id in to_embed.iter() {
             let chunk = evidence.get_chunk(chunk_id)?;
             let v = embedder.embed(&input.model, &chunk.text).map_err(|e| {
                 AppError::new("AI_EMBEDDINGS_FAILED", "Failed to compute embeddings")
@@ -181,16 +257,25 @@ impl IndexStore {
             vectors.insert(chunk_id.clone(), v);
         }
 
-        self.write_vectors(&vectors)?;
+        // Update hashes from the current chunk summaries (stable).
+        for s in chunk_summaries.iter() {
+            hashes.insert(s.chunk_id.clone(), s.text_sha256.clone());
+        }
 
-        let st = AiIndexStatus {
+        // Write results atomically (tmp->rename). Only after embeddings succeed.
+        self.write_vectors(&vectors)?;
+        self.write_hashes(&hashes)?;
+
+        current = AiIndexStatus {
             ready: true,
             model: Some(input.model),
             dims,
             chunk_count: vectors.len() as u32,
+            chunks_total: ids.len() as u32,
+            source_id: input.source_id,
             updated_at: Some(input.updated_at),
         };
-        self.write_status(&st)?;
-        Ok(st)
+        self.write_status(&current)?;
+        Ok(current)
     }
 }

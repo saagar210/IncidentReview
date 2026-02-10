@@ -153,3 +153,68 @@ fn draft_succeeds_with_valid_citation_marker() {
     assert_eq!(res.citations.len(), 1);
     assert_eq!(res.citations[0].chunk_id, chunk_id);
 }
+
+#[test]
+fn highlights_require_citation_per_bullet() {
+    let (evidence, chunk_id) = setup_one_chunk_store();
+    let llm = MockLlm {
+        out: format!("- One highlight [[chunk:{chunk_id}]]\n- Second highlight without citation"),
+    };
+    let err = draft_section_with_llm(
+        &evidence,
+        &llm,
+        "mock",
+        AiDraftSectionRequest {
+            section_id: SectionId::IncidentHighlightsTopN,
+            quarter_label: "Q1 2026".to_string(),
+            prompt: "test".to_string(),
+            citation_chunk_ids: vec![chunk_id],
+        },
+    )
+    .expect_err("should error");
+    assert_eq!(err.code, "AI_CITATION_REQUIRED");
+}
+
+#[test]
+fn narrative_requires_citation_per_paragraph() {
+    let (evidence, chunk_id) = setup_one_chunk_store();
+    let llm = MockLlm {
+        out: format!("First paragraph [[chunk:{chunk_id}]]\n\nSecond paragraph without citation"),
+    };
+    let err = draft_section_with_llm(
+        &evidence,
+        &llm,
+        "mock",
+        AiDraftSectionRequest {
+            section_id: SectionId::QuarterNarrativeRecap,
+            quarter_label: "Q1 2026".to_string(),
+            prompt: "test".to_string(),
+            citation_chunk_ids: vec![chunk_id],
+        },
+    )
+    .expect_err("should error");
+    assert_eq!(err.code, "AI_CITATION_REQUIRED");
+}
+
+#[test]
+fn themes_succeed_when_each_bullet_is_cited() {
+    let (evidence, chunk_id) = setup_one_chunk_store();
+    let llm = MockLlm {
+        out: format!("- Theme A [[chunk:{chunk_id}]]"),
+    };
+    let res = draft_section_with_llm(
+        &evidence,
+        &llm,
+        "mock",
+        AiDraftSectionRequest {
+            section_id: SectionId::ThemeAnalysis,
+            quarter_label: "Q1 2026".to_string(),
+            prompt: "test".to_string(),
+            citation_chunk_ids: vec![chunk_id.clone()],
+        },
+    )
+    .expect("should succeed");
+    assert!(res.markdown.contains("[[chunk:"));
+    assert_eq!(res.citations.len(), 1);
+    assert_eq!(res.citations[0].chunk_id, chunk_id);
+}
