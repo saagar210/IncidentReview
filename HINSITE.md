@@ -1126,3 +1126,41 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 
 6) Next steps
 - Phase 4 polish can continue (more endpoint coverage, UX tightening) without changing deterministic boundaries.
+
+---
+
+## 2026-02-10 - DS5.1 (in progress): sanitized import error contract codes + qir_core error tests
+
+1) Done: what changed + why
+- Hardened the sanitized import error contract in `qir_core`:
+  - Renamed manifest mismatch error codes to stable, UI-branchable identifiers:
+    - `INGEST_SANITIZED_MANIFEST_VERSION_MISMATCH`
+    - `INGEST_SANITIZED_MANIFEST_HASH_MISMATCH`
+    - `INGEST_SANITIZED_MANIFEST_BYTES_MISMATCH`
+- Added deterministic Rust tests asserting the exact `AppError.code` for DS5 flows:
+  - Import into non-empty DB -> `INGEST_SANITIZED_DB_NOT_EMPTY`
+  - Manifest version mismatch -> `INGEST_SANITIZED_MANIFEST_VERSION_MISMATCH`
+  - Manifest hash mismatch -> `INGEST_SANITIZED_MANIFEST_HASH_MISMATCH`
+  - Manifest bytes mismatch -> `INGEST_SANITIZED_MANIFEST_BYTES_MISMATCH`
+  - Metrics mismatch -> `INGEST_SANITIZED_METRICS_MISMATCH`
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/sanitize/import.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/sanitized_import_errors.rs
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- None for determinism/privacy. Next change-set will update the frontend to branch on `AppError.code` (removing any message substring matching).
+
+5) Status: current phase + complete / in progress / blocked
+- DS5.1: in progress.
+
+6) Next steps
+- Replace brittle UI string matching with code-based branching, and adjust the invoke wrapper to preserve structured `AppError` objects to callers.

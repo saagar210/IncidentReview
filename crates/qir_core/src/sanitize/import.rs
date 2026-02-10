@@ -84,8 +84,8 @@ fn verify_manifest_and_files(
 ) -> Result<(), AppError> {
     if manifest.manifest_version != 1 {
         return Err(AppError::new(
-            "INGEST_SANITIZED_MANIFEST_VERSION_UNSUPPORTED",
-            "Unsupported sanitized manifest version",
+            "INGEST_SANITIZED_MANIFEST_VERSION_MISMATCH",
+            "Sanitized manifest version mismatch (expected 1)",
         )
         .with_details(format!("manifest_version={}", manifest.manifest_version)));
     }
@@ -124,7 +124,7 @@ fn verify_manifest_and_files(
         let (sha, bytes) = sha256_file_hex_ingest(&path)?;
         if sha != f.sha256 {
             return Err(AppError::new(
-                "INGEST_SANITIZED_HASH_MISMATCH",
+                "INGEST_SANITIZED_MANIFEST_HASH_MISMATCH",
                 "Sanitized dataset file hash mismatch",
             )
             .with_details(format!(
@@ -134,7 +134,7 @@ fn verify_manifest_and_files(
         }
         if bytes != f.bytes {
             return Err(AppError::new(
-                "INGEST_SANITIZED_BYTES_MISMATCH",
+                "INGEST_SANITIZED_MANIFEST_BYTES_MISMATCH",
                 "Sanitized dataset file size mismatch",
             )
             .with_details(format!(
