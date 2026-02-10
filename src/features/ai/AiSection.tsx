@@ -5,6 +5,7 @@ import {
   AiDraftResponseSchema,
   AiHealthStatusSchema,
   AiIndexStatusSchema,
+  AiModelInfoListSchema,
   BuildChunksResultSchema,
   EvidenceQueryResponseSchema,
   EvidenceChunkSummaryListSchema,
@@ -56,6 +57,8 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
     chunk_count: number;
     updated_at?: string | null;
   }>(null);
+  const [availableModels, setAvailableModels] = useState<Array<{ name: string; size?: number | null; digest?: string | null; modified_at?: string | null }>>([]);
+  const [draftModel, setDraftModel] = useState<string>("llama3.2:latest");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [searchTopK, setSearchTopK] = useState<number>(8);
   const [searchHits, setSearchHits] = useState<
@@ -136,6 +139,12 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
     void (async () => {
       try {
         await runHealthCheck(false);
+        const tags = await invokeValidated("ai_models_list", undefined, AiModelInfoListSchema);
+        setAvailableModels(tags);
+        // Default selection: prefer known good defaults when present.
+        const names = new Set(tags.map((m) => m.name));
+        if (names.has("nomic-embed-text:latest")) setIndexModel("nomic-embed-text:latest");
+        if (names.has("llama3.2:latest")) setDraftModel("llama3.2:latest");
         const res = await invokeValidated("ai_evidence_list_sources", undefined, EvidenceSourceListSchema);
         setSources(res);
         setSelectedSourceId((cur) => cur || (res.length > 0 ? res[0].source_id : ""));
@@ -314,6 +323,7 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
             quarterLabel: draftQuarterLabel,
             prompt: draftPrompt,
             citationChunkIds: selectedCitationChunkIds,
+            model: draftModel,
           },
         },
         AiDraftResponseSchema
@@ -358,6 +368,11 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
           healthOk={String(healthOk)}; sources={sources.length}; chunks(selected)={chunks.length}; indexReady=
           {String(indexStatus?.ready ?? null)}; selectedCitations={selectedCitationChunkIds.length}
         </p>
+        {availableModels.length > 0 ? (
+          <p className="hint">Local models detected: {availableModels.map((m) => m.name).join(", ")}</p>
+        ) : (
+          <p className="hint">Local models: not loaded (use Health Check to confirm Ollama is running).</p>
+        )}
         {gate.reasonCode ? (
           <p className="hint">
             Blocked: <code>{gate.reasonCode}</code> {gate.reasonMessage ? `- ${gate.reasonMessage}` : ""}
@@ -483,7 +498,23 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
         <div className="grid">
           <label>
             Embedding model
-            <input value={indexModel} onChange={(e) => setIndexModel(e.target.value)} placeholder="e.g. nomic-embed-text" />
+            {availableModels.length > 0 ? (
+              <select value={indexModel} onChange={(e) => setIndexModel(e.target.value)}>
+                {availableModels.filter((m) => m.name.includes("embed")).length > 0 ? (
+                  availableModels
+                    .filter((m) => m.name.includes("embed"))
+                    .map((m) => (
+                      <option key={m.name} value={m.name}>
+                        {m.name}
+                      </option>
+                    ))
+                ) : (
+                  <option value={indexModel}>{indexModel}</option>
+                )}
+              </select>
+            ) : (
+              <input value={indexModel} onChange={(e) => setIndexModel(e.target.value)} placeholder="e.g. nomic-embed-text:latest" />
+            )}
           </label>
         </div>
         <div className="actions">
@@ -575,6 +606,26 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
           <label>
             Quarter label
             <input value={draftQuarterLabel} onChange={(e) => setDraftQuarterLabel(e.target.value)} />
+          </label>
+          <label>
+            Draft model
+            {availableModels.length > 0 ? (
+              <select value={draftModel} onChange={(e) => setDraftModel(e.target.value)}>
+                {availableModels.filter((m) => !m.name.includes("embed")).length > 0 ? (
+                  availableModels
+                    .filter((m) => !m.name.includes("embed"))
+                    .map((m) => (
+                      <option key={m.name} value={m.name}>
+                        {m.name}
+                      </option>
+                    ))
+                ) : (
+                  <option value={draftModel}>{draftModel}</option>
+                )}
+              </select>
+            ) : (
+              <input value={draftModel} onChange={(e) => setDraftModel(e.target.value)} placeholder="e.g. llama3.2:latest" />
+            )}
           </label>
         </div>
         <label>

@@ -1838,3 +1838,39 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 
 6) Next steps
 - Optional polish: add a “list installed Ollama models” command and a UI selector; keep it thin and localhost-only.
+
+---
+
+## 2026-02-10 - Phase 5.1: List local Ollama models + model selectors (risk mitigation)
+
+1) Done: what changed + why
+- Added a thin model-listing command (`ai_models_list`) that reads locally installed models from Ollama (`/api/tags` on 127.0.0.1).
+- Removed the hardcoded draft model assumption by requiring the UI to pass the selected model to `ai_draft_section`.
+- Updated the AI UI to auto-detect local models and provide dropdown selectors:
+  - embeddings model defaults to `nomic-embed-text:latest` when present
+  - draft model defaults to `llama3.2:latest` when present
+- This directly addresses the primary Phase 5 risk: drafting failing because a hardcoded model is not installed.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/ollama.rs
+- /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs
+- /Users/d/Projects/IncidentReview/src/lib/schemas.ts
+- /Users/d/Projects/IncidentReview/src/features/ai/AiSection.tsx
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Ollama CLI printed an MLX symbol warning on this machine (`MLX: Failed to load symbol ...`), but the local HTTP API works and models list/drafting can proceed via the API. If performance issues arise, investigate local Ollama install/runtime settings.
+
+5) Status: current phase + complete / in progress / blocked
+- Phase 5.1: complete.
+
+6) Next steps
+- Continue Phase 5 follow-ups: additional draft sections (Step 2) and an evidence viewer (Step 3).

@@ -166,6 +166,15 @@ export const AiHealthStatusSchema = z.object({
   message: z.string(),
 });
 
+export const AiModelInfoSchema = z.object({
+  name: z.string(),
+  size: z.number().int().nonnegative().nullable().optional(),
+  digest: z.string().nullable().optional(),
+  modified_at: z.string().nullable().optional(),
+});
+
+export const AiModelInfoListSchema = z.array(AiModelInfoSchema);
+
 export const EvidenceSourceTypeSchema = z.enum([
   "sanitized_export",
   "slack_transcript",

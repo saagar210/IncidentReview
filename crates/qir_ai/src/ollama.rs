@@ -1,8 +1,23 @@
 use qir_core::error::AppError;
+use serde::Deserialize;
 
 #[derive(Debug, Clone)]
 pub struct OllamaClient {
     base_url: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OllamaTagsResponse {
+    pub models: Vec<OllamaModelInfo>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OllamaModelInfo {
+    pub name: String,
+    pub model: Option<String>,
+    pub modified_at: Option<String>,
+    pub size: Option<u64>,
+    pub digest: Option<String>,
 }
 
 impl OllamaClient {
@@ -64,6 +79,32 @@ impl OllamaClient {
             Ok(r) if r.status() == 200 => Ok(()),
             Ok(r) => Err(
                 AppError::new("AI_OLLAMA_UNHEALTHY", "Ollama health check failed")
+                    .with_details(format!("status={}", r.status())),
+            ),
+            Err(e) => Err(
+                AppError::new("AI_OLLAMA_UNHEALTHY", "Failed to reach Ollama on 127.0.0.1")
+                    .with_details(e.to_string())
+                    .with_retryable(true),
+            ),
+        }
+    }
+
+    pub fn list_models(&self) -> Result<Vec<OllamaModelInfo>, AppError> {
+        let url = format!("{}/api/tags", self.base_url);
+        let resp = ureq::get(&url)
+            .timeout(std::time::Duration::from_millis(1200))
+            .call();
+
+        match resp {
+            Ok(r) if r.status() == 200 => {
+                let v: OllamaTagsResponse = r.into_json().map_err(|e| {
+                    AppError::new("AI_OLLAMA_UNHEALTHY", "Failed to decode Ollama tags response")
+                        .with_details(e.to_string())
+                })?;
+                Ok(v.models)
+            }
+            Ok(r) => Err(
+                AppError::new("AI_OLLAMA_UNHEALTHY", "Ollama tags request failed")
                     .with_details(format!("status={}", r.status())),
             ),
             Err(e) => Err(

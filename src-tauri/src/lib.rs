@@ -2,7 +2,7 @@ use std::fs;
 use std::sync::Mutex;
 use std::path::PathBuf;
 
-use qir_ai::ollama::OllamaClient;
+use qir_ai::ollama::{OllamaClient, OllamaModelInfo};
 use qir_ai::evidence::{
     BuildChunksResult as AiBuildChunksResult, EvidenceAddSourceInput as AiEvidenceAddSourceInput,
     EvidenceChunkSummary as AiEvidenceChunkSummary, EvidenceOrigin as AiEvidenceOrigin,
@@ -55,6 +55,14 @@ pub struct AiHealthStatus {
     pub message: String,
 }
 
+#[derive(Debug, serde::Serialize)]
+pub struct AiModelInfo {
+    pub name: String,
+    pub size: Option<u64>,
+    pub digest: Option<String>,
+    pub modified_at: Option<String>,
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct EvidenceAddSourceRequest {
     #[serde(rename = "type")]
@@ -86,6 +94,7 @@ pub struct AiDraftSectionRequestWire {
     pub quarter_label: String,
     pub prompt: String,
     pub citation_chunk_ids: Vec<String>,
+    pub model: String,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -509,6 +518,22 @@ fn ai_health_check() -> Result<AiHealthStatus, AppError> {
 }
 
 #[tauri::command]
+fn ai_models_list() -> Result<Vec<AiModelInfo>, AppError> {
+    let client = OllamaClient::new("http://127.0.0.1:11434")?;
+    let mut models = client.list_models()?;
+    models.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(models
+        .into_iter()
+        .map(|m: OllamaModelInfo| AiModelInfo {
+            name: m.name,
+            size: m.size,
+            digest: m.digest,
+            modified_at: m.modified_at,
+        })
+        .collect())
+}
+
+#[tauri::command]
 fn ai_evidence_add_source(
     app: tauri::AppHandle,
     req: EvidenceAddSourceRequest,
@@ -609,14 +634,10 @@ fn ai_draft_section(
     let evidence = AiEvidenceStore::open(root);
     let llm = ai_llm()?;
 
-    // Minimal shippable default. Users must have this model installed locally in Ollama.
-    // Future: surface installed models via a dedicated command and UI selector.
-    let model = "llama3";
-
     ai_draft_with_llm(
         &evidence,
         &llm,
-        model,
+        &req.model,
         AiDraftSectionRequest {
             section_id: req.section_id,
             quarter_label: req.quarter_label,
@@ -753,6 +774,7 @@ pub fn run() {
             validation_report,
             slack_preview,
             slack_ingest,
+            ai_models_list,
             ai_health_check,
             ai_evidence_add_source,
             ai_evidence_list_sources,
