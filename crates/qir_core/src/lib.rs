@@ -1,5 +1,7 @@
 pub mod analytics;
+pub mod backup;
 pub mod db;
+pub mod demo;
 pub mod domain;
 pub mod error;
 pub mod ingest;
@@ -8,6 +10,7 @@ pub mod normalize;
 pub mod profiles;
 pub mod repo;
 pub mod report;
+pub mod sanitize;
 pub mod validate;
 
 #[cfg(test)]

@@ -82,6 +82,7 @@ These are required by `AGENTS.md`:
 - Deliverable Set 1 is complete: Jira CSV import UX + mapping profile CRUD + profile-based import with inserted/updated/skipped + warnings + conflict surfacing.
 - Deliverable Set 2 is complete: Slack ingest UX + deterministic timestamp normalization contract (raw preservation) + Validation/Anomalies UI baseline.
 - Deliverable Set 3 is complete: dashboards expansion (Detection/Response/Vendor-Service) + deterministic QIR report v1 + incident drill-down detail UX.
+- Deliverable Set 4 is complete: backup/restore + sanitized export + demo dataset tooling + git hygiene.
 
 ## Stop Conditions
 

@@ -51,6 +51,7 @@ pub fn list_incidents(conn: &Connection) -> Result<Vec<Incident>, AppError> {
         start_ts, first_observed_ts, it_awareness_ts, ack_ts, mitigate_ts, resolve_ts,
         start_ts_raw, first_observed_ts_raw, it_awareness_ts_raw, ack_ts_raw, mitigate_ts_raw, resolve_ts_raw
       FROM incidents
+      ORDER BY id ASC
       "#,
     )
     .map_err(|e| {
@@ -251,6 +252,59 @@ pub fn list_timeline_events_for_incident(
         })?);
     }
 
+    Ok(out)
+}
+
+pub fn list_timeline_events(conn: &Connection) -> Result<Vec<TimelineEvent>, AppError> {
+    let mut stmt = conn
+        .prepare(
+            r#"
+      SELECT
+        id, incident_id, source, ts, author, kind, text, raw_json, created_at
+      FROM timeline_events
+      ORDER BY
+        COALESCE(incident_id, 0) ASC,
+        COALESCE(ts, '9999-12-31T23:59:59Z') ASC,
+        id ASC
+      "#,
+        )
+        .map_err(|e| {
+            AppError::new(
+                "DB_QUERY_FAILED",
+                "Failed to prepare timeline events query",
+            )
+            .with_details(e.to_string())
+        })?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(TimelineEvent {
+                id: row.get(0)?,
+                incident_id: row.get(1)?,
+                source: row.get(2)?,
+                ts: row.get(3)?,
+                author: row.get(4)?,
+                kind: row.get(5)?,
+                text: row.get(6)?,
+                raw_json: row.get(7)?,
+                created_at: row.get(8)?,
+            })
+        })
+        .map_err(|e| {
+            AppError::new("DB_QUERY_FAILED", "Failed to query timeline events")
+                .with_details(e.to_string())
+        })?;
+
+    let mut out = Vec::new();
+    for r in rows {
+        out.push(r.map_err(|e| {
+            AppError::new(
+                "DB_QUERY_FAILED",
+                "Failed to decode timeline event row",
+            )
+            .with_details(e.to_string())
+        })?);
+    }
     Ok(out)
 }
 

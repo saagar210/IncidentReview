@@ -178,6 +178,55 @@ export const IncidentListItemSchema = z.object({
 
 export const IncidentListSchema = z.array(IncidentListItemSchema);
 
+export const BackupFileEntrySchema = z.object({
+  rel_path: z.string(),
+  sha256: z.string(),
+  bytes: z.number().int().nonnegative(),
+});
+
+export const BackupCountsSchema = z.object({
+  incidents: z.number().int().nonnegative(),
+  timeline_events: z.number().int().nonnegative(),
+  artifacts_rows: z.number().int().nonnegative(),
+});
+
+export const BackupDbInfoSchema = z.object({
+  filename: z.string(),
+  sha256: z.string(),
+  bytes: z.number().int().nonnegative(),
+});
+
+export const BackupArtifactsInfoSchema = z.object({
+  included: z.boolean(),
+  files: z.array(BackupFileEntrySchema),
+});
+
+export const BackupManifestSchema = z.object({
+  manifest_version: z.number().int().nonnegative(),
+  app_version: z.string(),
+  export_time: z.string(),
+  schema_migrations: z.array(z.string()),
+  counts: BackupCountsSchema,
+  db: BackupDbInfoSchema,
+  artifacts: BackupArtifactsInfoSchema,
+});
+
+export const BackupCreateResultSchema = z.object({
+  backup_dir: z.string(),
+  manifest: BackupManifestSchema,
+});
+
+export const RestoreResultSchema = z.object({
+  ok: z.boolean(),
+  restored_db_path: z.string(),
+  restored_artifacts: z.boolean(),
+});
+
+export const SanitizedExportResultSchema = z.object({
+  export_dir: z.string(),
+  incident_count: z.number().int().nonnegative(),
+});
+
 export const SlackPreviewSchema = z.object({
   detected_format: z.string(),
   line_count: z.number().int().nonnegative(),

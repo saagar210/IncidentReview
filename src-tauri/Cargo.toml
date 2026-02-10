@@ -19,7 +19,10 @@ qir_ai = { path = "../crates/qir_ai" }
 rusqlite = { version = "0.32.1", features = ["bundled"] }
 
 tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+time = { version = "0.3.47", features = ["formatting"] }

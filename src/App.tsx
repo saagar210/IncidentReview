@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import ReactECharts from "echarts-for-react";
+import { open } from "@tauri-apps/plugin-dialog";
 
 import { invokeValidated } from "./lib/tauri";
 import {
@@ -14,6 +15,10 @@ import {
   AiHealthStatusSchema,
   IncidentListSchema,
   IncidentDetailSchema,
+  BackupCreateResultSchema,
+  BackupManifestSchema,
+  RestoreResultSchema,
+  SanitizedExportResultSchema,
   SlackPreviewSchema,
   SlackIngestSummarySchema,
   ValidationReportSchema,
@@ -157,6 +162,36 @@ export default function App() {
   const [reportMd, setReportMd] = useState<string>("");
   const [incidentFilterIds, setIncidentFilterIds] = useState<number[] | null>(null);
   const [incidentFilterLabel, setIncidentFilterLabel] = useState<string>("");
+
+  const [backupResult, setBackupResult] = useState<null | {
+    backup_dir: string;
+    manifest: {
+      manifest_version: number;
+      app_version: string;
+      export_time: string;
+      schema_migrations: string[];
+      counts: { incidents: number; timeline_events: number; artifacts_rows: number };
+      db: { filename: string; sha256: string; bytes: number };
+      artifacts: { included: boolean; files: Array<{ rel_path: string; sha256: string; bytes: number }> };
+    };
+  }>(null);
+
+  const [restoreBackupDir, setRestoreBackupDir] = useState<string>("");
+  const [restoreManifest, setRestoreManifest] = useState<null | {
+    manifest_version: number;
+    app_version: string;
+    export_time: string;
+    schema_migrations: string[];
+    counts: { incidents: number; timeline_events: number; artifacts_rows: number };
+    db: { filename: string; sha256: string; bytes: number };
+    artifacts: { included: boolean; files: Array<{ rel_path: string; sha256: string; bytes: number }> };
+  }>(null);
+  const [restoreAllowOverwrite, setRestoreAllowOverwrite] = useState<boolean>(false);
+  const [restoreResult, setRestoreResult] = useState<null | { ok: boolean; restored_db_path: string; restored_artifacts: boolean }>(
+    null
+  );
+
+  const [sanitizedExport, setSanitizedExport] = useState<null | { export_dir: string; incident_count: number }>(null);
 
   const [incidentDetailOpen, setIncidentDetailOpen] = useState<boolean>(false);
   const [incidentDetailLoading, setIncidentDetailLoading] = useState<boolean>(false);
@@ -447,7 +482,7 @@ export default function App() {
 
   async function onSeedDemo() {
     try {
-      const res = await invokeValidated("seed_demo_jira", undefined, JiraImportSummarySchema);
+      const res = await invokeValidated("seed_demo_dataset", undefined, JiraImportSummarySchema);
       setSeedInserted(res.inserted);
       if (res.warnings.length > 0 || res.conflicts.length > 0) {
         pushToast({
@@ -613,6 +648,96 @@ export default function App() {
       pushToast({ kind: "success", title: "AI OK", message: res.message });
     } catch (e) {
       pushToast({ kind: "error", title: "AI unavailable", message: String(e) });
+    }
+  }
+
+  async function pickDirectory(): Promise<string | null> {
+    const res = await open({ directory: true, multiple: false });
+    if (!res) return null;
+    if (Array.isArray(res)) return res[0] ?? null;
+    return res;
+  }
+
+  async function onBackupCreate() {
+    try {
+      const dest = await pickDirectory();
+      if (!dest) return;
+      const res = await invokeValidated("backup_create", { destinationDir: dest }, BackupCreateResultSchema);
+      setBackupResult(res);
+      pushToast({
+        kind: "success",
+        title: "Backup created",
+        message: `${res.backup_dir} (incidents=${res.manifest.counts.incidents})`,
+      });
+    } catch (e) {
+      pushToast({ kind: "error", title: "Backup failed", message: String(e) });
+    }
+  }
+
+  async function onPickBackupForRestore() {
+    try {
+      const dir = await pickDirectory();
+      if (!dir) return;
+      setRestoreBackupDir(dir);
+      setRestoreAllowOverwrite(false);
+      setRestoreResult(null);
+      const manifest = await invokeValidated("backup_inspect", { backupDir: dir }, BackupManifestSchema);
+      setRestoreManifest(manifest);
+      pushToast({
+        kind: "success",
+        title: "Backup selected",
+        message: `${manifest.export_time} (incidents=${manifest.counts.incidents})`,
+      });
+    } catch (e) {
+      setRestoreBackupDir("");
+      setRestoreManifest(null);
+      pushToast({ kind: "error", title: "Load backup failed", message: String(e) });
+    }
+  }
+
+  async function onRestoreFromBackup() {
+    try {
+      if (!restoreBackupDir || !restoreManifest) {
+        pushToast({ kind: "error", title: "No backup selected", message: "Pick a backup folder first." });
+        return;
+      }
+      if (!restoreAllowOverwrite) {
+        pushToast({
+          kind: "error",
+          title: "Confirmation required",
+          message: "Check the overwrite confirmation box before restoring.",
+        });
+        return;
+      }
+      const res = await invokeValidated(
+        "restore_from_backup",
+        { backupDir: restoreBackupDir, allowOverwrite: true },
+        RestoreResultSchema
+      );
+      setRestoreResult(res);
+      pushToast({
+        kind: "success",
+        title: "Restore complete",
+        message: `db=${res.restored_db_path} artifacts=${res.restored_artifacts ? "yes" : "no"}`,
+      });
+    } catch (e) {
+      pushToast({ kind: "error", title: "Restore failed", message: String(e) });
+    }
+  }
+
+  async function onExportSanitizedDataset() {
+    try {
+      const dest = await pickDirectory();
+      if (!dest) return;
+      const res = await invokeValidated("export_sanitized_dataset", { destinationDir: dest }, SanitizedExportResultSchema);
+      setSanitizedExport(res);
+      pushToast({
+        kind: "success",
+        title: "Sanitized export created",
+        message: `${res.export_dir} (incidents=${res.incident_count})`,
+      });
+    } catch (e) {
+      pushToast({ kind: "error", title: "Sanitized export failed", message: String(e) });
     }
   }
 
@@ -876,6 +1001,9 @@ export default function App() {
           <a className="btn btn--accent" href="#dashboards">
             Dashboards
           </a>
+          <a className="btn" href="#data">
+            Backup/Restore
+          </a>
           <a className="btn" href="#report">
             Report
           </a>
@@ -890,7 +1018,7 @@ export default function App() {
             Init DB
           </button>
           <button className="btn" onClick={onSeedDemo} type="button">
-            Seed Demo (Jira CSV)
+            Seed Demo Dataset
           </button>
           <button className="btn btn--accent" onClick={onLoadDashboard} type="button">
             Load Dashboard
@@ -906,6 +1034,109 @@ export default function App() {
           This app does not compute metrics in the UI. Dashboards and report data are computed in{" "}
           <code>crates/qir_core</code>.
         </p>
+      </section>
+
+      <section className="card" id="data">
+        <h2>Backup / Restore (Local-Only)</h2>
+        <div className="actions">
+          <button className="btn" type="button" onClick={onBackupCreate}>
+            Create Backup Folder...
+          </button>
+          <button className="btn" type="button" onClick={onPickBackupForRestore}>
+            Pick Backup For Restore...
+          </button>
+          <button className="btn btn--accent" type="button" onClick={onRestoreFromBackup} disabled={!restoreManifest}>
+            Restore (Overwrite)
+          </button>
+          <button className="btn" type="button" onClick={onExportSanitizedDataset}>
+            Export Sanitized Dataset...
+          </button>
+        </div>
+        <p className="hint">
+          Backups are exported as folders containing <span className="mono">incidentreview.sqlite</span> and{" "}
+          <span className="mono">manifest.json</span> (no zip by default). Restore requires explicit overwrite
+          confirmation and validates DB hashes from the manifest.
+        </p>
+
+        {sanitizedExport && (
+          <section className="card">
+            <h2>Last Sanitized Export</h2>
+            <p className="hint">
+              Folder: <span className="mono">{sanitizedExport.export_dir}</span>
+            </p>
+            <p className="hint">
+              Incidents: <span className="mono">{sanitizedExport.incident_count}</span>
+            </p>
+            <p className="hint">
+              Free-text fields (Slack text, notes) are redacted; categories are pseudonymized deterministically for sharing.
+            </p>
+          </section>
+        )}
+
+        {backupResult && (
+          <section className="card">
+            <h2>Last Backup</h2>
+            <p className="hint">
+              Folder: <span className="mono">{backupResult.backup_dir}</span>
+            </p>
+            <div className="kpiRow">
+              <div className="kpi">
+                <div className="kpi__label">Incidents</div>
+                <div className="kpi__value">{backupResult.manifest.counts.incidents}</div>
+              </div>
+              <div className="kpi">
+                <div className="kpi__label">Timeline events</div>
+                <div className="kpi__value">{backupResult.manifest.counts.timeline_events}</div>
+              </div>
+              <div className="kpi">
+                <div className="kpi__label">Artifacts rows</div>
+                <div className="kpi__value">{backupResult.manifest.counts.artifacts_rows}</div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {restoreManifest && (
+          <section className="card">
+            <h2>Restore Preview</h2>
+            <p className="hint">
+              Selected: <span className="mono">{restoreBackupDir}</span>
+            </p>
+            <ul className="list">
+              <li>
+                Export time: <span className="mono">{restoreManifest.export_time}</span>
+              </li>
+              <li>
+                App version: <span className="mono">{restoreManifest.app_version}</span>
+              </li>
+              <li>
+                Incidents: <span className="mono">{restoreManifest.counts.incidents}</span>
+              </li>
+              <li>
+                Timeline events: <span className="mono">{restoreManifest.counts.timeline_events}</span>
+              </li>
+              <li>
+                Artifacts included: <span className="mono">{restoreManifest.artifacts.included ? "yes" : "no"}</span>
+              </li>
+            </ul>
+
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={restoreAllowOverwrite}
+                onChange={(e) => setRestoreAllowOverwrite(e.currentTarget.checked)}
+              />
+              I understand this will overwrite my local database.
+            </label>
+
+            {restoreResult && (
+              <p className="hint">
+                Restore result: <span className="mono">{restoreResult.ok ? "ok" : "failed"}</span> (db:{" "}
+                <span className="mono">{restoreResult.restored_db_path}</span>)
+              </p>
+            )}
+          </section>
+        )}
       </section>
 
       <section className="card" id="jira">

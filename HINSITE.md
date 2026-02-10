@@ -804,3 +804,158 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 
 6) Next steps
 - Confirm the next milestone (likely backup/restore + sanitized export + demo dataset tooling), keeping AI features gated.
+
+---
+
+## 2026-02-10 - DS4 foundation: qir_core backup/restore core + tests (folder export, manifest, integrity)
+
+1) Done: what changed + why
+- Implemented deterministic, local-only backup + restore primitives in `crates/qir_core`:
+  - Backup creates a folder `IncidentReviewBackup_<timestamp>/` containing:
+    - `incidentreview.sqlite` (SQLite snapshot via rusqlite backup API)
+    - `manifest.json` (app version, export time, applied migrations, row counts, DB hash; optional artifacts hash list)
+    - `artifacts/` is included only if an on-disk artifacts directory exists (not required for current app usage).
+  - Restore validates `manifest.json` integrity (DB SHA-256) and requires explicit overwrite confirmation (`allow_overwrite=true`) before swapping the target DB into place.
+- Added `qir_core` tests to ensure backup folder contents and restore behavior are correct and auditable.
+- Updated `PLANS.md` to mark DS4 as in progress.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/lib.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/backup/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/Cargo.toml
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/backup_restore.rs
+- /Users/d/Projects/IncidentReview/PLANS.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Restore currently keeps a `*.pre_restore` copy of the previous DB (safety-first). We may later add a UI affordance to delete old pre-restore copies explicitly.
+- Artifacts directory backup/restore is implemented generically; the app does not yet heavily use on-disk artifacts, so we should confirm the desired artifacts-on-disk strategy before relying on it.
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 4: in progress (core backup/restore done; still need Tauri/UI wiring, sanitized export, and demo dataset tooling).
+
+6) Next steps
+- Add thin Tauri commands for backup/restore + a simple UI flow that picks directories, previews manifests, and requires explicit confirmation before overwrite.
+- Implement deterministic sanitized export (JSON/CSV) with pseudonymization + tests proving no raw Slack text leaks.
+
+---
+
+## 2026-02-10 - DS4 wiring: Tauri backup/restore commands + UI directory picker + explicit overwrite confirmation
+
+1) Done: what changed + why
+- Added thin Tauri commands that wrap the new `qir_core` backup/restore primitives:
+  - `backup_create(destination_dir)` -> creates a human-auditable backup folder (DB snapshot + manifest).
+  - `backup_inspect(backup_dir)` -> reads and returns the manifest for UI preview.
+  - `restore_from_backup(backup_dir, allow_overwrite)` -> validates manifest integrity and swaps DB into place only when overwrite is explicitly confirmed.
+- Implemented a minimal UI flow for backup/restore:
+  - Uses a native directory picker (Tauri dialog plugin) to select destination/backup folders.
+  - Shows manifest preview (counts/export time/app version) before restore.
+  - Requires an explicit “I understand this will overwrite…” checkbox before restore.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/package.json
+- /Users/d/Projects/IncidentReview/pnpm-lock.yaml
+- /Users/d/Projects/IncidentReview/src-tauri/Cargo.toml
+- /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs
+- /Users/d/Projects/IncidentReview/src/lib/schemas.ts
+- /Users/d/Projects/IncidentReview/src/App.tsx
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Backup/restore UI currently focuses on correctness and explicit confirmation. If we later add “dry-run restore”, it should remain a thin wrapper over `qir_core` integrity checks (no UI-side assumptions).
+- Adding the dialog plugin introduces additional build-time dependencies (still local-only at runtime). This was chosen to satisfy the “user-chosen directory” requirement without requiring users to type paths.
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 4: in progress (backup/restore wired; still need sanitized export + demo dataset tooling + git hygiene completion).
+
+6) Next steps
+- Implement deterministic sanitized export (JSON/CSV) with stable pseudonymization + tests proving no raw Slack text leaks.
+- Improve “Seed Demo Dataset” to generate a richer, sanitized dataset for dashboards/reports (no real incident data).
+
+---
+
+## 2026-02-10 - DS4 sanitized export + demo dataset tooling: deterministic shareable exports (no Slack text)
+
+1) Done: what changed + why
+- Implemented deterministic “Export Sanitized Dataset” in `crates/qir_core`:
+  - Exports a shareable folder `IncidentReviewSanitized_<timestamp>/` containing JSON files (`incidents.json`, `timeline_events.json`, `warnings.json`) plus `sanitized_manifest.json`.
+  - Redacts free-text (Slack message text is never exported; timeline events carry `text_redacted=true` only).
+  - Pseudonymizes vendor/service/detection_source deterministically (stable across runs for the same input DB).
+  - Preserves numeric/timestamp/taxonomy fields so dashboards still tell a story.
+- Added tests proving:
+  - sanitized output does not contain raw Slack message text
+  - pseudonymization is stable across runs
+- Implemented a richer “Seed Demo Dataset” in `crates/qir_core` (40 sanitized incidents with realistic distributions).
+- Wired sanitized export + demo seed into Tauri commands and exposed both as clear UI actions.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/lib.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/demo/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/sanitize/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/repo/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/demo_seed.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/sanitized_export.rs
+- /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs
+- /Users/d/Projects/IncidentReview/src/lib/schemas.ts
+- /Users/d/Projects/IncidentReview/src/App.tsx
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Sanitized export currently produces JSON only (transparent and GitHub-safe). If we later add an “import sanitized dataset” flow, keep it deterministic and owned by `qir_core`.
+- Pseudonymization mappings are deterministic but intentionally lossy; this is expected for shareable datasets.
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 4: in progress (features implemented; still need git hygiene finalization: DS4 completion commit + ds4 tag + clean status + PLANS update).
+
+6) Next steps
+- Finalize git hygiene: commit DS4 completion, create `ds4_complete` tag, ensure `git status` clean.
+- Update `PLANS.md` to mark DS4 complete.
+
+---
+
+## 2026-02-10 - DS4 completion: plan update + final verification + git hygiene (commit + tag)
+
+1) Done: what changed + why
+- Marked DS4 complete in `PLANS.md` and ran the full verification suite to confirm backup/restore + sanitized export + demo tooling remain green.
+- Git hygiene:
+  - Repository has commits (root baseline commit already exists).
+  - DS4 completion is committed and tagged locally as `ds4_complete` (with `ds1_complete`, `ds2_complete`, `ds3_complete` already present).
+  - Ensured the working tree is clean at milestone end.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- None for DS4 correctness. Future work should keep AI gated and maintain deterministic boundaries for any export/import flows.
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 4: complete.
+
+6) Next steps
+- Pick DS5 milestone (likely backup/restore UX polish, sanitized export import, or demo dataset export workflows), keeping all deterministic boundaries intact.
