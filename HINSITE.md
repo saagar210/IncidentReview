@@ -1164,3 +1164,41 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 
 6) Next steps
 - Replace brittle UI string matching with code-based branching, and adjust the invoke wrapper to preserve structured `AppError` objects to callers.
+
+---
+
+## 2026-02-10 - DS5.1 (in progress): frontend structured AppError propagation + code-based UI branching
+
+1) Done: what changed + why
+- Hardened the frontend error path so sanitized import UI branches on stable error codes (never message substrings):
+  - Updated `src/lib/tauri.ts` to preserve structured `AppError` objects by throwing a typed `AppErrorException` (includes `code`, `details`, `retryable`).
+  - Added `extractAppError` helper to unwrap common invoke error shapes without stringifying.
+  - Updated sanitized import UI handler to branch exclusively on `AppError.code` and show deterministic guidance text per code.
+- Added frontend tests to prove code-based handling:
+  - `invokeValidated` preserves `code` from a rejected invoke.
+  - Guidance mapping is deterministic and keyed only by `code`.
+- Confirmed removal of brittle matching: `includes(\"INGEST_SANITIZED...\")` is no longer used in `src/`.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/src/lib/tauri.ts
+- /Users/d/Projects/IncidentReview/src/lib/tauri.test.ts
+- /Users/d/Projects/IncidentReview/src/lib/sanitized_import_guidance.ts
+- /Users/d/Projects/IncidentReview/src/lib/sanitized_import_guidance.test.ts
+- /Users/d/Projects/IncidentReview/src/App.tsx
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- None for determinism/privacy. Next change-set will tighten `qir_ai` Phase 5 preflight guardrails (tests/boundaries only).
+
+5) Status: current phase + complete / in progress / blocked
+- DS5.1: in progress.
+
+6) Next steps
+- Phase 5 preflight guardrails in `qir_ai`: strict 127.0.0.1-only base URL enforcement, boundary test preventing `qir_core` metric dependencies, and an ignored placeholder test for citation enforcement.

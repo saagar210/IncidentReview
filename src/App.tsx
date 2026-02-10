@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import ReactECharts from "echarts-for-react";
 import { open } from "@tauri-apps/plugin-dialog";
 
-import { invokeValidated } from "./lib/tauri";
+import { extractAppError, invokeValidated } from "./lib/tauri";
+import { guidanceForSanitizedImportErrorCode } from "./lib/sanitized_import_guidance";
 import {
   DashboardPayloadV2Schema,
   InitDbResponseSchema,
@@ -805,12 +806,19 @@ export default function App() {
       await onGenerateReport();
       await onRefreshValidationReport();
     } catch (e) {
-      const msg = String(e);
-      const guidance =
-        msg.includes("INGEST_SANITIZED_DB_NOT_EMPTY") ?
-          "\n\nThis import refuses to run on a non-empty DB. Restore/seed into a fresh DB first, then retry." :
-          "";
-      pushToast({ kind: "error", title: "Sanitized import failed", message: msg + guidance });
+      const appErr = extractAppError(e);
+      if (appErr) {
+        const guidance = guidanceForSanitizedImportErrorCode(appErr.code);
+        const details = appErr.details ? `\n\nDetails:\n${typeof appErr.details === "string" ? appErr.details : JSON.stringify(appErr.details)}` : "";
+        const msg = `${appErr.code}: ${appErr.message}${details}`;
+        pushToast({
+          kind: "error",
+          title: "Sanitized import failed",
+          message: guidance ? `${msg}\n\n${guidance}` : msg,
+        });
+      } else {
+        pushToast({ kind: "error", title: "Sanitized import failed", message: String(e) });
+      }
     }
   }
 
