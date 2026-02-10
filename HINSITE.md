@@ -1566,3 +1566,62 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 
 6) Next steps
 - Optional: consider code-splitting the ECharts-heavy dashboards bundle (keep offline-only) if startup performance becomes an issue.
+
+---
+
+## 2026-02-10 - Repo publish + branch/worktree cleanup (ops hygiene)
+
+1) Done: what changed + why
+- Merged DS7 UI modularization into `main` (fast-forward) and verified the full required suite stayed green.
+- Created a public GitHub repository for the project and pushed `main` so the current state is accessible for review and iteration.
+- Cleaned up local milestone branches and removed the DS7 git worktree to keep the repo tidy and reduce confusion about “what is current”.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/HINSITE.md
+- /Users/d/Projects/IncidentReview/PLANS.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- None. This was operational hygiene only (publish + cleanup) and did not change app logic.
+
+5) Status: current phase + complete / in progress / blocked
+- Phase 4 productization: complete through DS7.
+- Phase 5 (local AI): foundations only; completion remains pending.
+
+6) Next steps
+- Decide the next Phase 5 milestone (evidence chunking/index build, embeddings/similarity search, or citation-backed drafting) and define the minimum end-to-end slice to ship next.
+
+---
+
+## 2026-02-10 - Docs refresh (current state + Phase 5 guidance request)
+
+1) Done: what changed + why
+- Updated the roadmap/status docs to reflect the current DS1–DS7 completion state and clarify Phase 5 as the next major deliverable.
+- Re-ran the full required verification suite after the docs edits to preserve the audit trail and keep `main` green.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- None. Doc-only change.
+
+5) Status: current phase + complete / in progress / blocked
+- Phase 4 productization: complete through DS7.
+- Phase 5 (local AI): foundations only; completion remains pending.
+
+6) Next steps
+- Use the Phase 5 prompt in this thread to get a crisp milestone plan/spec, then implement Phase 5 in small, verification-logged change-sets.

@@ -78,7 +78,8 @@ These are required by `AGENTS.md`:
 - Phase 0 scaffold is complete and all required verification commands are green.
 - Phase 1 foundations are in place: migrations, Jira CSV ingest (fixture + test), Slack transcript ingest (fixture + test), validators, and deterministic per-incident metrics.
 - Phase 2/3/4 initial vertical slice exists: versioned dashboard payloads + ECharts UI + drill-down table, deterministic Markdown report generation with a golden fixture, and thin Tauri commands.
-- Phase 5 has started (foundations only): Ollama localhost-only health checks, file-based evidence store, and citation enforcement guardrail. Drafting/indexing is not implemented yet.
+- Phase 4 productization work is in place: unified `AppError` contract end-to-end, DS5/DS6/DS7 flows are navigable and UI code is split into feature modules under `src/features/*`.
+- Phase 5 has started (foundations only): Ollama localhost-only health checks, evidence store, and citation enforcement guardrail. Drafting/indexing is not implemented yet.
 - Deliverable Set 1 is complete: Jira CSV import UX + mapping profile CRUD + profile-based import with inserted/updated/skipped + warnings + conflict surfacing.
 - Deliverable Set 2 is complete: Slack ingest UX + deterministic timestamp normalization contract (raw preservation) + Validation/Anomalies UI baseline.
 - Deliverable Set 3 is complete: dashboards expansion (Detection/Response/Vendor-Service) + deterministic QIR report v1 + incident drill-down detail UX.
@@ -87,6 +88,24 @@ These are required by `AGENTS.md`:
 - Deliverable Set 5.1 is complete: sanitized import error contract hardening (UI branches on error codes, not message substrings) + Phase 5 preflight guardrails (tests/boundaries only).
 - Deliverable Set 6 is complete: workspace + DB lifecycle (create/open/switch) to operationalize sanitized import into fresh DBs.
 - Deliverable Set 7 is complete: navigation + UI modularization (split `src/App.tsx` into feature modules; preserve behavior and refresh discipline; add lightweight section smoke tests).
+
+## Repo / Release State
+
+- Default branch: `main`
+- GitHub (public): https://github.com/saagar210/IncidentReview
+
+## Roadmap: Next Concrete Work
+
+Phase 5 remains the next major phase. The intent is to add local-only AI capabilities that are evidence-backed and do **not** compute deterministic metrics:
+
+- Implement evidence chunking + indexing pipeline (local-only) in `crates/qir_ai`.
+- Add embeddings + similarity search (local-only) to support evidence retrieval.
+- Add prompt templates that require citations (or explicitly mark fields as `UNKNOWN`).
+- Add thin Tauri commands to:
+  - build/update the evidence index
+  - query evidence (top-k)
+  - draft report sections with citations enforced
+- Add UI gating for Phase 5 features behind the existing health checks.
 
 ## Stop Conditions
 
