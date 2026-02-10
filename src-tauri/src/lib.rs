@@ -1,4 +1,5 @@
 use std::fs;
+use std::sync::Mutex;
 use std::path::PathBuf;
 
 use qir_ai::ollama::OllamaClient;
@@ -22,9 +23,14 @@ use qir_core::sanitize::{
     SanitizedImportSummary,
 };
 use qir_core::validate::{validate_all_incidents, IncidentValidationReportItem};
+use qir_core::workspace::WorkspaceMetadata;
 use tauri::Manager;
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
+
+const WORKSPACE_CONFIG_FILE: &str = "workspace.json";
+const WORKSPACE_DEFAULT_DB_FILENAME: &str = "incidentreview.sqlite";
+const WORKSPACE_RECENT_LIMIT: usize = 8;
 
 #[derive(Debug, serde::Serialize)]
 pub struct InitDbResponse {
@@ -49,6 +55,26 @@ pub struct IncidentListItem {
     pub title: String,
 }
 
+#[derive(Debug, serde::Serialize)]
+pub struct WorkspaceInfo {
+    pub current_db_path: String,
+    pub recent_db_paths: Vec<String>,
+    pub load_error: Option<AppError>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct WorkspaceConfig {
+    last_db_path: Option<String>,
+    recent_db_paths: Vec<String>,
+}
+
+#[derive(Default)]
+struct WorkspaceState {
+    current_db_path: Mutex<Option<PathBuf>>,
+    recent_db_paths: Mutex<Vec<PathBuf>>,
+    load_error: Mutex<Option<AppError>>,
+}
+
 fn default_db_path(app: &tauri::AppHandle) -> Result<PathBuf, AppError> {
     let dir = app.path().app_data_dir().map_err(|e| {
         AppError::new("DB_PATH_FAILED", "Failed to resolve app data directory")
@@ -63,10 +89,67 @@ fn default_db_path(app: &tauri::AppHandle) -> Result<PathBuf, AppError> {
     Ok(dir.join("incidentreview.sqlite"))
 }
 
-fn open_and_migrate(db_path: &PathBuf) -> Result<rusqlite::Connection, AppError> {
-    let mut conn = qir_core::db::open(db_path)?;
-    qir_core::db::migrate(&mut conn)?;
-    Ok(conn)
+fn config_path(app: &tauri::AppHandle) -> Result<PathBuf, AppError> {
+    let dir = app.path().app_config_dir().map_err(|e| {
+        AppError::new("WORKSPACE_PERSIST_FAILED", "Failed to resolve app config directory")
+            .with_details(e.to_string())
+    })?;
+    fs::create_dir_all(&dir).map_err(|e| {
+        AppError::new("WORKSPACE_PERSIST_FAILED", "Failed to create app config directory")
+            .with_details(format!("path={}; err={}", dir.display(), e))
+    })?;
+    Ok(dir.join(WORKSPACE_CONFIG_FILE))
+}
+
+fn read_workspace_config(app: &tauri::AppHandle) -> Result<WorkspaceConfig, AppError> {
+    let path = config_path(app)?;
+    if !path.exists() {
+        return Ok(WorkspaceConfig {
+            last_db_path: None,
+            recent_db_paths: Vec::new(),
+        });
+    }
+    let bytes = fs::read(&path).map_err(|e| {
+        AppError::new("WORKSPACE_PERSIST_FAILED", "Failed to read workspace config")
+            .with_details(format!("path={}; err={}", path.display(), e))
+    })?;
+    serde_json::from_slice(&bytes).map_err(|e| {
+        AppError::new("WORKSPACE_PERSIST_FAILED", "Failed to decode workspace config")
+            .with_details(format!("path={}; err={}", path.display(), e))
+    })
+}
+
+fn write_workspace_config(app: &tauri::AppHandle, cfg: &WorkspaceConfig) -> Result<(), AppError> {
+    let path = config_path(app)?;
+    let tmp = path.with_extension("tmp");
+    let json = serde_json::to_string_pretty(cfg).map_err(|e| {
+        AppError::new("WORKSPACE_PERSIST_FAILED", "Failed to encode workspace config")
+            .with_details(e.to_string())
+    })?;
+    fs::write(&tmp, json.as_bytes()).map_err(|e| {
+        AppError::new("WORKSPACE_PERSIST_FAILED", "Failed to write workspace config")
+            .with_details(format!("path={}; err={}", tmp.display(), e))
+    })?;
+    fs::rename(&tmp, &path).map_err(|e| {
+        AppError::new("WORKSPACE_PERSIST_FAILED", "Failed to finalize workspace config write")
+            .with_details(format!("tmp={}; dest={}; err={}", tmp.display(), path.display(), e))
+    })?;
+    Ok(())
+}
+
+fn resolve_current_db_path(app: &tauri::AppHandle, state: &WorkspaceState) -> Result<PathBuf, AppError> {
+    if let Some(p) = state.current_db_path.lock().unwrap().clone() {
+        return Ok(p);
+    }
+    default_db_path(app)
+}
+
+fn open_current_workspace_conn(
+    app: &tauri::AppHandle,
+    state: &WorkspaceState,
+) -> Result<rusqlite::Connection, AppError> {
+    let db_path = resolve_current_db_path(app, state)?;
+    qir_core::workspace::open_workspace_connection(&db_path)
 }
 
 fn default_artifacts_dir(app: &tauri::AppHandle) -> Result<PathBuf, AppError> {
@@ -85,17 +168,106 @@ fn now_rfc3339_utc() -> Result<String, AppError> {
 
 #[tauri::command]
 fn init_db(app: tauri::AppHandle) -> Result<InitDbResponse, AppError> {
-    let db_path = default_db_path(&app)?;
-    let _conn = open_and_migrate(&db_path)?;
+    let state = app.state::<WorkspaceState>();
+    let db_path = resolve_current_db_path(&app, &state)?;
+    let _conn = qir_core::workspace::open_workspace_connection(&db_path)?;
     Ok(InitDbResponse {
         db_path: db_path.to_string_lossy().to_string(),
     })
 }
 
+fn push_recent(state: &WorkspaceState, db_path: &PathBuf) {
+    let mut v = state.recent_db_paths.lock().unwrap();
+    v.retain(|p| p != db_path);
+    v.insert(0, db_path.clone());
+    if v.len() > WORKSPACE_RECENT_LIMIT {
+        v.truncate(WORKSPACE_RECENT_LIMIT);
+    }
+}
+
+#[tauri::command]
+fn workspace_get_current(app: tauri::AppHandle) -> Result<WorkspaceInfo, AppError> {
+    let state = app.state::<WorkspaceState>();
+    let current = resolve_current_db_path(&app, &state)?;
+    let recent = state
+        .recent_db_paths
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|p| p.to_string_lossy().to_string())
+        .collect::<Vec<_>>();
+    let load_error = state.load_error.lock().unwrap().clone();
+    Ok(WorkspaceInfo {
+        current_db_path: current.to_string_lossy().to_string(),
+        recent_db_paths: recent,
+        load_error,
+    })
+}
+
+#[tauri::command]
+fn workspace_open(app: tauri::AppHandle, db_path: String) -> Result<WorkspaceMetadata, AppError> {
+    let state = app.state::<WorkspaceState>();
+    let db_path = PathBuf::from(db_path);
+
+    let meta = qir_core::workspace::open_workspace(&db_path)?;
+
+    *state.current_db_path.lock().unwrap() = Some(db_path.clone());
+    push_recent(&state, &db_path);
+
+    let cfg = WorkspaceConfig {
+        last_db_path: Some(db_path.to_string_lossy().to_string()),
+        recent_db_paths: state
+            .recent_db_paths
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect(),
+    };
+    write_workspace_config(&app, &cfg)?;
+
+    Ok(meta)
+}
+
+#[tauri::command]
+fn workspace_create(app: tauri::AppHandle, destination_dir: String, filename: Option<String>) -> Result<WorkspaceMetadata, AppError> {
+    let state = app.state::<WorkspaceState>();
+    let dir = PathBuf::from(destination_dir);
+    if !dir.is_dir() {
+        return Err(AppError::new(
+            "WORKSPACE_INVALID_PATH",
+            "Workspace destination must be an existing directory",
+        )
+        .with_details(dir.display().to_string()));
+    }
+
+    let name = filename.unwrap_or_else(|| WORKSPACE_DEFAULT_DB_FILENAME.to_string());
+    let db_path = dir.join(name);
+
+    let meta = qir_core::workspace::create_workspace(&db_path)?;
+
+    *state.current_db_path.lock().unwrap() = Some(db_path.clone());
+    push_recent(&state, &db_path);
+
+    let cfg = WorkspaceConfig {
+        last_db_path: Some(db_path.to_string_lossy().to_string()),
+        recent_db_paths: state
+            .recent_db_paths
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect(),
+    };
+    write_workspace_config(&app, &cfg)?;
+
+    Ok(meta)
+}
+
 #[tauri::command]
 fn seed_demo_jira(app: tauri::AppHandle) -> Result<JiraImportSummary, AppError> {
-    let db_path = default_db_path(&app)?;
-    let mut conn = open_and_migrate(&db_path)?;
+    let state = app.state::<WorkspaceState>();
+    let mut conn = open_current_workspace_conn(&app, &state)?;
 
     let csv_text = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -126,29 +298,29 @@ fn seed_demo_jira(app: tauri::AppHandle) -> Result<JiraImportSummary, AppError> 
 
 #[tauri::command]
 fn seed_demo_dataset(app: tauri::AppHandle) -> Result<JiraImportSummary, AppError> {
-    let db_path = default_db_path(&app)?;
-    let mut conn = open_and_migrate(&db_path)?;
+    let state = app.state::<WorkspaceState>();
+    let mut conn = open_current_workspace_conn(&app, &state)?;
     core_seed_demo_dataset(&mut conn)
 }
 
 #[tauri::command]
 fn get_dashboard_v1(app: tauri::AppHandle) -> Result<DashboardPayloadV1, AppError> {
-    let db_path = default_db_path(&app)?;
-    let conn = open_and_migrate(&db_path)?;
+    let state = app.state::<WorkspaceState>();
+    let conn = open_current_workspace_conn(&app, &state)?;
     qir_core::analytics::build_dashboard_payload_v1(&conn)
 }
 
 #[tauri::command]
 fn get_dashboard_v2(app: tauri::AppHandle) -> Result<DashboardPayloadV2, AppError> {
-    let db_path = default_db_path(&app)?;
-    let conn = open_and_migrate(&db_path)?;
+    let state = app.state::<WorkspaceState>();
+    let conn = open_current_workspace_conn(&app, &state)?;
     qir_core::analytics::build_dashboard_payload_v2(&conn)
 }
 
 #[tauri::command]
 fn generate_report_md(app: tauri::AppHandle) -> Result<String, AppError> {
-    let db_path = default_db_path(&app)?;
-    let conn = open_and_migrate(&db_path)?;
+    let state = app.state::<WorkspaceState>();
+    let conn = open_current_workspace_conn(&app, &state)?;
     generate_qir_markdown(&conn)
 }
 
@@ -159,8 +331,8 @@ fn jira_csv_preview(csv_text: String, max_rows: usize) -> Result<JiraCsvPreview,
 
 #[tauri::command]
 fn jira_profiles_list(app: tauri::AppHandle) -> Result<Vec<JiraMappingProfile>, AppError> {
-    let db_path = default_db_path(&app)?;
-    let conn = open_and_migrate(&db_path)?;
+    let state = app.state::<WorkspaceState>();
+    let conn = open_current_workspace_conn(&app, &state)?;
     list_profiles(&conn)
 }
 
@@ -169,15 +341,15 @@ fn jira_profiles_upsert(
     app: tauri::AppHandle,
     profile: JiraMappingProfileUpsert,
 ) -> Result<JiraMappingProfile, AppError> {
-    let db_path = default_db_path(&app)?;
-    let mut conn = open_and_migrate(&db_path)?;
+    let state = app.state::<WorkspaceState>();
+    let mut conn = open_current_workspace_conn(&app, &state)?;
     upsert_profile(&mut conn, profile)
 }
 
 #[tauri::command]
 fn jira_profiles_delete(app: tauri::AppHandle, id: i64) -> Result<DeleteResponse, AppError> {
-    let db_path = default_db_path(&app)?;
-    let mut conn = open_and_migrate(&db_path)?;
+    let state = app.state::<WorkspaceState>();
+    let mut conn = open_current_workspace_conn(&app, &state)?;
     delete_profile(&mut conn, id)?;
     Ok(DeleteResponse { ok: true })
 }
@@ -188,16 +360,16 @@ fn jira_import_using_profile(
     profile_id: i64,
     csv_text: String,
 ) -> Result<JiraImportSummary, AppError> {
-    let db_path = default_db_path(&app)?;
-    let mut conn = open_and_migrate(&db_path)?;
+    let state = app.state::<WorkspaceState>();
+    let mut conn = open_current_workspace_conn(&app, &state)?;
     let profile = qir_core::profiles::jira::get_profile(&conn, profile_id)?;
     import_jira_csv(&mut conn, &csv_text, &profile.mapping)
 }
 
 #[tauri::command]
 fn incidents_list(app: tauri::AppHandle) -> Result<Vec<IncidentListItem>, AppError> {
-    let db_path = default_db_path(&app)?;
-    let conn = open_and_migrate(&db_path)?;
+    let state = app.state::<WorkspaceState>();
+    let conn = open_current_workspace_conn(&app, &state)?;
     let incidents = qir_core::repo::list_incidents(&conn)?;
 
     Ok(incidents
@@ -212,15 +384,15 @@ fn incidents_list(app: tauri::AppHandle) -> Result<Vec<IncidentListItem>, AppErr
 
 #[tauri::command]
 fn incident_detail(app: tauri::AppHandle, incident_id: i64) -> Result<qir_core::repo::IncidentDetail, AppError> {
-    let db_path = default_db_path(&app)?;
-    let conn = open_and_migrate(&db_path)?;
+    let state = app.state::<WorkspaceState>();
+    let conn = open_current_workspace_conn(&app, &state)?;
     qir_core::repo::get_incident_detail(&conn, incident_id)
 }
 
 #[tauri::command]
 fn validation_report(app: tauri::AppHandle) -> Result<Vec<IncidentValidationReportItem>, AppError> {
-    let db_path = default_db_path(&app)?;
-    let conn = open_and_migrate(&db_path)?;
+    let state = app.state::<WorkspaceState>();
+    let conn = open_current_workspace_conn(&app, &state)?;
     validate_all_incidents(&conn)
 }
 
@@ -236,8 +408,8 @@ fn slack_ingest(
     new_incident_title: Option<String>,
     transcript_text: String,
 ) -> Result<SlackIngestSummary, AppError> {
-    let db_path = default_db_path(&app)?;
-    let mut conn = open_and_migrate(&db_path)?;
+    let state = app.state::<WorkspaceState>();
+    let mut conn = open_current_workspace_conn(&app, &state)?;
     ingest_slack_transcript_text(
         &mut conn,
         incident_id,
@@ -258,8 +430,9 @@ fn ai_health_check() -> Result<AiHealthStatus, AppError> {
 
 #[tauri::command]
 fn backup_create(app: tauri::AppHandle, destination_dir: String) -> Result<BackupCreateResult, AppError> {
-    let db_path = default_db_path(&app)?;
-    let conn = open_and_migrate(&db_path)?;
+    let state = app.state::<WorkspaceState>();
+    let db_path = resolve_current_db_path(&app, &state)?;
+    let conn = qir_core::workspace::open_workspace_connection(&db_path)?;
     let artifacts_dir = default_artifacts_dir(&app)?;
     let export_time = now_rfc3339_utc()?;
     let dest_root = PathBuf::from(destination_dir);
@@ -291,7 +464,8 @@ fn restore_from_backup(
     backup_dir: String,
     allow_overwrite: bool,
 ) -> Result<RestoreResult, AppError> {
-    let db_path = default_db_path(&app)?;
+    let state = app.state::<WorkspaceState>();
+    let db_path = resolve_current_db_path(&app, &state)?;
     let artifacts_dir = default_artifacts_dir(&app)?;
     let artifacts_opt = Some(artifacts_dir.as_path());
 
@@ -308,8 +482,8 @@ fn export_sanitized_dataset(
     app: tauri::AppHandle,
     destination_dir: String,
 ) -> Result<SanitizedExportResult, AppError> {
-    let db_path = default_db_path(&app)?;
-    let conn = open_and_migrate(&db_path)?;
+    let state = app.state::<WorkspaceState>();
+    let conn = open_current_workspace_conn(&app, &state)?;
     let export_time = now_rfc3339_utc()?;
     let dest_root = PathBuf::from(destination_dir);
     core_export_sanitized_dataset(&conn, dest_root.as_path(), &export_time, env!("CARGO_PKG_VERSION"))
@@ -325,18 +499,47 @@ fn import_sanitized_dataset(
     app: tauri::AppHandle,
     dataset_dir: String,
 ) -> Result<SanitizedImportSummary, AppError> {
-    let db_path = default_db_path(&app)?;
-    let mut conn = open_and_migrate(&db_path)?;
+    let state = app.state::<WorkspaceState>();
+    let mut conn = open_current_workspace_conn(&app, &state)?;
     core_import_sanitized_dataset(&mut conn, PathBuf::from(dataset_dir).as_path())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(WorkspaceState::default())
+        .setup(|app| {
+            let handle = app.handle();
+            let state = app.state::<WorkspaceState>();
+            let cfg = match read_workspace_config(&handle) {
+                Ok(c) => c,
+                Err(e) => {
+                    *state.load_error.lock().unwrap() = Some(e);
+                    WorkspaceConfig {
+                        last_db_path: None,
+                        recent_db_paths: Vec::new(),
+                    }
+                }
+            };
+
+            if let Some(p) = cfg.last_db_path.as_deref() {
+                *state.current_db_path.lock().unwrap() = Some(PathBuf::from(p));
+            }
+            let recent = cfg
+                .recent_db_paths
+                .iter()
+                .map(PathBuf::from)
+                .collect::<Vec<_>>();
+            *state.recent_db_paths.lock().unwrap() = recent;
+            Ok(())
+        })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             init_db,
+            workspace_get_current,
+            workspace_open,
+            workspace_create,
             seed_demo_jira,
             seed_demo_dataset,
             get_dashboard_v1,

@@ -1307,3 +1307,36 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 6) Next steps
 - Implement thin Tauri workspace commands + state and persistence of last-opened workspace path.
 - Update UI to create/open/switch workspaces and refresh all views without stale data.
+
+---
+
+## 2026-02-10 - DS6 (in progress): thin Tauri workspace commands + state + persistence
+
+1) Done: what changed + why
+- Implemented workspace-aware DB lifecycle in `src-tauri` as a thin RPC/state layer:
+  - Added `workspace_get_current`, `workspace_open(db_path)`, `workspace_create(destination_dir, filename?)`.
+  - Added in-memory state for the current workspace DB path and a small recent list.
+  - Persisted the last-opened workspace DB path locally in the app config directory (`workspace.json`), with atomic write semantics.
+  - Refactored all existing commands to open/migrate the *current workspace* DB via `qir_core::workspace` (no migrations performed outside `qir_core`).
+- This makes the DS5 rule “sanitized import must target an empty DB” operational by allowing users to create and switch to a fresh workspace DB first.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- UI still needs a workspace picker/creator UI and a refresh discipline to avoid stale data after switching.
+
+5) Status: current phase + complete / in progress / blocked
+- DS6: in progress.
+
+6) Next steps
+- Add minimal Workspace UX in the frontend (create/open/switch) and ensure all screens refresh from the new DB after switching.
+- Add frontend tests for “switch triggers reload” behavior.
