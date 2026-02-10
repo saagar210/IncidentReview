@@ -16,7 +16,11 @@ use qir_core::profiles::jira::{
     delete_profile, list_profiles, upsert_profile, JiraMappingProfile, JiraMappingProfileUpsert,
 };
 use qir_core::report::generate_qir_markdown;
-use qir_core::sanitize::{export_sanitized_dataset as core_export_sanitized_dataset, SanitizedExportResult};
+use qir_core::sanitize::{
+    export_sanitized_dataset as core_export_sanitized_dataset, import_sanitized_dataset as core_import_sanitized_dataset,
+    inspect_sanitized_dataset as core_inspect_sanitized_dataset, SanitizedExportManifest, SanitizedExportResult,
+    SanitizedImportSummary,
+};
 use qir_core::validate::{validate_all_incidents, IncidentValidationReportItem};
 use tauri::Manager;
 use time::format_description::well_known::Rfc3339;
@@ -311,6 +315,21 @@ fn export_sanitized_dataset(
     core_export_sanitized_dataset(&conn, dest_root.as_path(), &export_time, env!("CARGO_PKG_VERSION"))
 }
 
+#[tauri::command]
+fn inspect_sanitized_dataset(dataset_dir: String) -> Result<SanitizedExportManifest, AppError> {
+    core_inspect_sanitized_dataset(PathBuf::from(dataset_dir).as_path())
+}
+
+#[tauri::command]
+fn import_sanitized_dataset(
+    app: tauri::AppHandle,
+    dataset_dir: String,
+) -> Result<SanitizedImportSummary, AppError> {
+    let db_path = default_db_path(&app)?;
+    let mut conn = open_and_migrate(&db_path)?;
+    core_import_sanitized_dataset(&mut conn, PathBuf::from(dataset_dir).as_path())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -338,7 +357,9 @@ pub fn run() {
             backup_create,
             backup_inspect,
             restore_from_backup,
-            export_sanitized_dataset
+            export_sanitized_dataset,
+            inspect_sanitized_dataset,
+            import_sanitized_dataset
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

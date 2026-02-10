@@ -1030,3 +1030,33 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 6) Next steps
 - Add thin Tauri commands for sanitized dataset inspect/import (no business logic in `src-tauri`).
 - Add a UI flow to pick a dataset folder, preview the manifest, run import, and refresh dashboards/report/validation.
+
+---
+
+## 2026-02-10 - DS5 (in progress): thin Tauri commands for sanitized dataset inspect/import
+
+1) Done: what changed + why
+- Added thin Tauri commands in `src-tauri` that wrap the new deterministic `qir_core` sanitized import functionality:
+  - `inspect_sanitized_dataset(dataset_dir)` -> returns `SanitizedExportManifest` for UI preview and validates manifest integrity (including hashes/sizes).
+  - `import_sanitized_dataset(dataset_dir)` -> runs deterministic import into the app DB (refuses non-empty DB; metrics cross-check enforced by `qir_core`).
+- Kept `src-tauri` as a thin RPC layer only (no import business logic).
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- None identified for DS5 correctness. UI still needs to surface “DB not empty” errors clearly with guidance to restore/seed into a fresh DB first.
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 5: in progress.
+
+6) Next steps
+- Add UI flow for sanitized dataset import: directory picker, manifest preview, import trigger + results display, and refresh existing views by re-calling commands.
