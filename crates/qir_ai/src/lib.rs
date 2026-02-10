@@ -11,8 +11,21 @@ mod tests {
     #[test]
     fn enforces_localhost_only_base_url() {
         assert!(OllamaClient::new("http://127.0.0.1:11434").is_ok());
+        assert!(OllamaClient::new("http://127.0.0.1").is_ok());
+
         assert!(OllamaClient::new("http://localhost:11434").is_err());
+        assert!(OllamaClient::new("http://0.0.0.0:11434").is_err());
+        assert!(OllamaClient::new("http://[::1]:11434").is_err());
         assert!(OllamaClient::new("https://example.com").is_err());
+
+        // Harden against prefix-based bypasses.
+        assert!(OllamaClient::new("http://127.0.0.1.evil.com:11434").is_err());
+        assert!(OllamaClient::new("http://127.0.0.1@evil.com:11434").is_err());
+        assert!(OllamaClient::new("http://127.0.0.1:").is_err());
+        assert!(OllamaClient::new("http://127.0.0.1:0").is_err());
+        assert!(OllamaClient::new("http://127.0.0.1:99999").is_err());
+        assert!(OllamaClient::new("http://127.0.0.1:11434/").is_ok()); // trailing slash is trimmed
+        assert!(OllamaClient::new("http://127.0.0.1:11434/api").is_err());
     }
 
     #[test]

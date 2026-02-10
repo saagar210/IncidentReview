@@ -1202,3 +1202,36 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 
 6) Next steps
 - Phase 5 preflight guardrails in `qir_ai`: strict 127.0.0.1-only base URL enforcement, boundary test preventing `qir_core` metric dependencies, and an ignored placeholder test for citation enforcement.
+
+---
+
+## 2026-02-10 - DS5.1 (in progress): Phase 5 preflight guardrails (qir_ai tests/boundaries only)
+
+1) Done: what changed + why
+- Tightened Phase 5 preflight guardrails in `qir_ai` (no AI feature expansion):
+  - Hardened Ollama base URL validation to accept only `http://127.0.0.1[:port]` using strict parsing (no prefix matching bypasses).
+  - Expanded unit tests to reject `localhost`, `0.0.0.0`, IPv6 loopback, remote hosts, userinfo, paths, and invalid ports.
+  - Added a boundary guardrail test to prevent `qir_ai` from importing `qir_core` metric computation modules (AI must not compute deterministic metrics).
+  - Added an ignored placeholder test for future Phase 5 end-to-end citation enforcement wiring.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/ollama.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/lib.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/tests/boundaries.rs
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK (includes 1 ignored placeholder test)
+
+4) Risks / follow-ups
+- The strict base URL validator intentionally rejects `localhost` even if it resolves to loopback, per binding rules. Keep this strictness unless policy changes.
+
+5) Status: current phase + complete / in progress / blocked
+- DS5.1: in progress.
+
+6) Next steps
+- Update `PLANS.md` to record DS5.1 contract-hardening work, and add DS5.1 completion entry after final verification + final repo hygiene checks.
