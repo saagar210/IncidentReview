@@ -9,6 +9,12 @@ use crate::metrics;
 use crate::repo;
 use crate::validate;
 
+mod import;
+pub use import::{
+    import_sanitized_dataset, inspect_sanitized_dataset, read_sanitized_manifest,
+    SanitizedImportSummary,
+};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SanitizedExportManifest {
     pub manifest_version: u32,

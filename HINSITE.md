@@ -959,3 +959,43 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 
 6) Next steps
 - Pick DS5 milestone (likely backup/restore UX polish, sanitized export import, or demo dataset export workflows), keeping all deterministic boundaries intact.
+
+---
+
+## 2026-02-10 - DS5 (in progress): qir_core sanitized dataset import primitives + plan update
+
+1) Done: what changed + why
+- Implemented deterministic sanitized dataset import in `crates/qir_core` to complement DS4 sanitized export:
+  - Reads and validates `sanitized_manifest.json` (requires `manifest_version == 1`).
+  - Verifies SHA-256 hashes and byte sizes for all files listed in the manifest (hard fail on mismatch).
+  - Refuses import into non-empty DB (`INGEST_SANITIZED_DB_NOT_EMPTY`).
+  - Inserts incidents in sorted `incident_key` order and uses `export_time` from the manifest for deterministic `ingested_at` / `created_at`.
+  - Uses deterministic redaction placeholders for NOT NULL fields:
+    - `incidents.title = "Incident <incident_key>"`
+    - `timeline_events.text = "[REDACTED]"` plus `raw_json={"text_redacted":true}` as an explicit redaction marker.
+  - Recomputes deterministic metrics from imported timestamps and hard-fails on mismatch (`INGEST_SANITIZED_METRICS_MISMATCH`).
+  - Reconciles warnings non-fatally: surfaces `INGEST_SANITIZED_WARNINGS_MISMATCH` as an import warning when validator output differs from `warnings.json`.
+- Updated `PLANS.md` to mark Deliverable Set 5 as in progress.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/sanitize/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/sanitize/import.rs
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Warning reconciliation is intentionally non-fatal in DS5; mismatches are surfaced as an import warning for visibility without blocking app usage.
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 5: in progress.
+
+6) Next steps
+- Add deterministic round-trip tests (seed demo -> sanitized export -> import into fresh DB -> dashboards/report/validation succeed).
+- Wire thin Tauri RPC commands for inspect/import and add a UI flow to import a sanitized dataset folder.
