@@ -83,7 +83,7 @@ These are required by `AGENTS.md`:
 - Deliverable Set 2 is complete: Slack ingest UX + deterministic timestamp normalization contract (raw preservation) + Validation/Anomalies UI baseline.
 - Deliverable Set 3 is complete: dashboards expansion (Detection/Response/Vendor-Service) + deterministic QIR report v1 + incident drill-down detail UX.
 - Deliverable Set 4 is complete: backup/restore + sanitized export + demo dataset tooling + git hygiene.
-- Deliverable Set 5 is in progress: import sanitized dataset + deterministic round-trip tests (export -> import -> dashboards/report/validation).
+- Deliverable Set 5 is complete: import sanitized dataset + deterministic round-trip tests (export -> import -> dashboards/report/validation).
 
 ## Stop Conditions
 

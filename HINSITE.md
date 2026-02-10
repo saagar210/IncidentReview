@@ -1094,3 +1094,35 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 
 6) Next steps
 - Update `PLANS.md` to mark DS5 complete and add a DS5 completion log entry after final verification.
+
+---
+
+## 2026-02-10 - DS5 completion: sanitized dataset import + round-trip tests + RPC + UI
+
+1) Done: what changed + why
+- Completed DS5: “Import sanitized dataset (deterministic) + round-trip tests”.
+  - `qir_core` now supports deterministic sanitized dataset import from the DS4 export folder format (`incidents.json`, `timeline_events.json`, `warnings.json`, `sanitized_manifest.json`).
+  - Import enforces offline/local-only integrity checks (manifest version + SHA-256 + byte sizes), refuses non-empty DB, and hard-fails on metrics mismatch.
+  - Added deterministic round-trip tests proving export -> import preserves dashboards/report/validation and does not leak sensitive Slack markers.
+  - Added thin Tauri RPC commands + a UI flow (directory picker, manifest preview, import result + warnings, and refresh).
+- Marked DS5 complete in `PLANS.md`.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Warning reconciliation remains intentionally non-fatal; mismatches are surfaced as `INGEST_SANITIZED_WARNINGS_MISMATCH` warnings so the app remains usable while the warning contract stabilizes.
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 5: complete.
+
+6) Next steps
+- Phase 4 polish can continue (more endpoint coverage, UX tightening) without changing deterministic boundaries.
