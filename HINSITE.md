@@ -1418,3 +1418,151 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 
 6) Status: current phase + complete / in progress / blocked
 - DS6: complete.
+
+---
+
+## 2026-02-10 - DS7.1 Navigation scaffold + first feature extraction (UI-only)
+
+1) Done: what changed + why
+- Added a small navigation component that groups the app into the required sections (Workspace, Imports, Dashboards, Validation, Backup/Restore, Report) while keeping the existing anchor/jump behavior.
+- Extracted shared UI utilities from `src/App.tsx` (`formatSeconds`, directory/DB pickers) to keep the main component smaller and make upcoming modularization safer.
+- Extracted the Workspace UI into `src/features/workspace/WorkspaceSection.tsx` as the first feature module, with a node-only smoke test.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview-ds7/src/ui/AppNav.tsx
+- /Users/d/Projects/IncidentReview-ds7/src/lib/format.ts
+- /Users/d/Projects/IncidentReview-ds7/src/lib/pickers.ts
+- /Users/d/Projects/IncidentReview-ds7/src/features/workspace/WorkspaceSection.tsx
+- /Users/d/Projects/IncidentReview-ds7/src/features/workspace/WorkspaceSection.test.tsx
+- /Users/d/Projects/IncidentReview-ds7/src/App.tsx
+- /Users/d/Projects/IncidentReview-ds7/PLANS.md
+- /Users/d/Projects/IncidentReview-ds7/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview-ds7/AGENTS.md; script source: /Users/d/Projects/IncidentReview-ds7/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview-ds7/AGENTS.md; script source: /Users/d/Projects/IncidentReview-ds7/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview-ds7/AGENTS.md; script source: /Users/d/Projects/IncidentReview-ds7/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview-ds7/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview-ds7/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- None for this change-set. Next extractions should keep props/state wiring stable to avoid regressions.
+
+5) Status: current phase + complete / in progress / blocked
+- DS7: in progress.
+
+6) Next steps
+- Extract Imports (Jira/Slack/Sanitized), Dashboards, Validation, Report, and Backup/Restore sections into `src/features/*` modules.
+- Add a lightweight smoke test per top-level section (node-only render checks and flow/action tests where feasible without a DOM environment).
+
+---
+
+## 2026-02-10 - DS7.2 Imports modularization (Jira/Slack/Sanitized) (UI-only)
+
+1) Done: what changed + why
+- Split the Imports UI into feature modules:
+  - Jira CSV import: `src/features/import_jira/*`
+  - Slack transcript import: `src/features/import_slack/*`
+  - Sanitized dataset import/export: `src/features/import_sanitized/*`
+- Moved the sanitized import/export UI out of Backup/Restore into the Imports area (per DS7 scope) while preserving the underlying behavior and keeping error handling code-based (AppError codes only).
+- Added node-only smoke tests for each Imports feature module.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview-ds7/src/features/import_jira/JiraImportSection.tsx
+- /Users/d/Projects/IncidentReview-ds7/src/features/import_jira/JiraImportSection.test.tsx
+- /Users/d/Projects/IncidentReview-ds7/src/features/import_slack/SlackImportSection.tsx
+- /Users/d/Projects/IncidentReview-ds7/src/features/import_slack/SlackImportSection.test.tsx
+- /Users/d/Projects/IncidentReview-ds7/src/features/import_sanitized/SanitizedImportSection.tsx
+- /Users/d/Projects/IncidentReview-ds7/src/features/import_sanitized/SanitizedImportSection.test.tsx
+- /Users/d/Projects/IncidentReview-ds7/src/App.tsx
+- /Users/d/Projects/IncidentReview-ds7/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview-ds7/AGENTS.md; script source: /Users/d/Projects/IncidentReview-ds7/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview-ds7/AGENTS.md; script source: /Users/d/Projects/IncidentReview-ds7/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview-ds7/AGENTS.md; script source: /Users/d/Projects/IncidentReview-ds7/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview-ds7/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview-ds7/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- None for core functionality. This is structural refactoring; remaining DS7 work should keep state/handler wiring stable and continue adding smoke coverage.
+
+5) Status: current phase + complete / in progress / blocked
+- DS7: in progress.
+
+6) Next steps
+- Extract Backup/Restore, Validation/Anomalies, Report, and Dashboards into feature modules under `src/features/*`.
+- Add smoke tests for remaining top-level sections and ensure workspace switching still clears stale UI state and reloads views.
+
+---
+
+## 2026-02-10 - DS7.3 Backup/Restore + Validation + Report modularization (UI-only)
+
+1) Done: what changed + why
+- Extracted additional top-level sections from `src/App.tsx` into feature modules:
+  - Backup/Restore: `src/features/backup_restore/*`
+  - Validation/Anomalies: `src/features/validation/*`
+  - Report: `src/features/report/*`
+- Preserved behavior and refresh discipline by keeping all data-loading and state transitions in `App.tsx`, passing handlers and state down to feature components.
+- Added node-only smoke tests for each extracted section.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview-ds7/src/features/backup_restore/BackupRestoreSection.tsx
+- /Users/d/Projects/IncidentReview-ds7/src/features/backup_restore/BackupRestoreSection.test.tsx
+- /Users/d/Projects/IncidentReview-ds7/src/features/validation/ValidationSection.tsx
+- /Users/d/Projects/IncidentReview-ds7/src/features/validation/ValidationSection.test.tsx
+- /Users/d/Projects/IncidentReview-ds7/src/features/report/ReportSection.tsx
+- /Users/d/Projects/IncidentReview-ds7/src/features/report/ReportSection.test.tsx
+- /Users/d/Projects/IncidentReview-ds7/src/App.tsx
+- /Users/d/Projects/IncidentReview-ds7/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview-ds7/AGENTS.md; script source: /Users/d/Projects/IncidentReview-ds7/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview-ds7/AGENTS.md; script source: /Users/d/Projects/IncidentReview-ds7/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview-ds7/AGENTS.md; script source: /Users/d/Projects/IncidentReview-ds7/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview-ds7/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview-ds7/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- None for core functionality. Remaining DS7 work is the Dashboards module (largest surface area) and should be extracted carefully to avoid regressions.
+
+5) Status: current phase + complete / in progress / blocked
+- DS7: in progress.
+
+6) Next steps
+- Extract Dashboards (charts + drill-down + incident drawer) into `src/features/dashboards/*`.
+- Add a node-only smoke test for dashboards rendering (with `echarts-for-react` mocked) to keep tests DOM-free.
+
+---
+
+## 2026-02-10 - DS7.4 Dashboards modularization + incident drawer extraction (UI-only)
+
+1) Done: what changed + why
+- Extracted the entire Dashboards UI (charts + drill-down table) into `src/features/dashboards/DashboardsSection.tsx`.
+- Extracted the incident detail drawer UI into `src/features/dashboards/IncidentDetailDrawer.tsx` and wired it back into `App.tsx` without changing data-loading logic (still invoked via existing Tauri commands).
+- Added node-only smoke tests for dashboards and the drawer; dashboards tests mock `echarts-for-react` to keep the suite DOM-free.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview-ds7/src/features/dashboards/DashboardsSection.tsx
+- /Users/d/Projects/IncidentReview-ds7/src/features/dashboards/DashboardsSection.test.tsx
+- /Users/d/Projects/IncidentReview-ds7/src/features/dashboards/IncidentDetailDrawer.tsx
+- /Users/d/Projects/IncidentReview-ds7/src/features/dashboards/IncidentDetailDrawer.test.tsx
+- /Users/d/Projects/IncidentReview-ds7/src/App.tsx
+- /Users/d/Projects/IncidentReview-ds7/PLANS.md
+- /Users/d/Projects/IncidentReview-ds7/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview-ds7/AGENTS.md; script source: /Users/d/Projects/IncidentReview-ds7/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview-ds7/AGENTS.md; script source: /Users/d/Projects/IncidentReview-ds7/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview-ds7/AGENTS.md; script source: /Users/d/Projects/IncidentReview-ds7/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview-ds7/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview-ds7/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- None for DS7 scope. Remaining productization work (if any) should focus on UX polish and not move deterministic logic out of `crates/qir_core`.
+
+5) Status: current phase + complete / in progress / blocked
+- DS7: complete.
+
+6) Next steps
+- Optional: consider code-splitting the ECharts-heavy dashboards bundle (keep offline-only) if startup performance becomes an issue.

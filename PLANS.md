@@ -86,6 +86,7 @@ These are required by `AGENTS.md`:
 - Deliverable Set 5 is complete: import sanitized dataset + deterministic round-trip tests (export -> import -> dashboards/report/validation).
 - Deliverable Set 5.1 is complete: sanitized import error contract hardening (UI branches on error codes, not message substrings) + Phase 5 preflight guardrails (tests/boundaries only).
 - Deliverable Set 6 is complete: workspace + DB lifecycle (create/open/switch) to operationalize sanitized import into fresh DBs.
+- Deliverable Set 7 is complete: navigation + UI modularization (split `src/App.tsx` into feature modules; preserve behavior and refresh discipline; add lightweight section smoke tests).
 
 ## Stop Conditions
 
