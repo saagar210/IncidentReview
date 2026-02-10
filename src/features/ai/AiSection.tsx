@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { invokeValidated, extractAppError } from "../../lib/tauri";
-import { BuildChunksResultSchema, EvidenceChunkSummaryListSchema, EvidenceSourceListSchema } from "../../lib/schemas";
+import {
+  AiIndexStatusSchema,
+  BuildChunksResultSchema,
+  EvidenceChunkSummaryListSchema,
+  EvidenceSourceListSchema,
+} from "../../lib/schemas";
 import { pickDirectory, pickTextFile } from "../../lib/pickers";
 
 type EvidenceSourceType = "sanitized_export" | "slack_transcript" | "incident_report_md" | "freeform_text";
@@ -32,6 +37,14 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
   const [addPath, setAddPath] = useState<string>("");
   const [addText, setAddText] = useState<string>("");
   const [selectedSourceId, setSelectedSourceId] = useState<string>("");
+  const [indexModel, setIndexModel] = useState<string>("nomic-embed-text");
+  const [indexStatus, setIndexStatus] = useState<null | {
+    ready: boolean;
+    model?: string | null;
+    dims?: number | null;
+    chunk_count: number;
+    updated_at?: string | null;
+  }>(null);
 
   const originKind = useMemo(() => defaultOriginKindForType(addType), [addType]);
 
@@ -138,6 +151,34 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
       props.onToast({
         kind: "error",
         title: "Build chunks failed",
+        message: appErr ? `${appErr.code}: ${appErr.message}` : String(e),
+      });
+    }
+  }
+
+  async function refreshIndexStatus() {
+    const st = await invokeValidated("ai_index_status", undefined, AiIndexStatusSchema);
+    setIndexStatus(st);
+  }
+
+  async function onBuildIndex() {
+    try {
+      const st = await invokeValidated(
+        "ai_index_build",
+        { req: { model: indexModel, sourceId: selectedSourceId || null } },
+        AiIndexStatusSchema
+      );
+      setIndexStatus(st);
+      props.onToast({
+        kind: "success",
+        title: "Index built",
+        message: `ready=${st.ready}; chunks=${st.chunk_count}; model=${st.model ?? "unknown"}`,
+      });
+    } catch (e) {
+      const appErr = extractAppError(e);
+      props.onToast({
+        kind: "error",
+        title: "Build index failed",
         message: appErr ? `${appErr.code}: ${appErr.message}` : String(e),
       });
     }
@@ -267,6 +308,33 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
           </ul>
         )}
         {chunks.length > 50 ? <p className="hint">Showing first 50 chunks.</p> : null}
+      </div>
+
+      <div className="card card--sub">
+        <h3>Index (Embeddings)</h3>
+        <p className="hint">Build an embeddings index locally via Ollama. Unit tests do not require Ollama.</p>
+        <div className="grid">
+          <label>
+            Embedding model
+            <input value={indexModel} onChange={(e) => setIndexModel(e.target.value)} placeholder="e.g. nomic-embed-text" />
+          </label>
+        </div>
+        <div className="actions">
+          <button className="btn" type="button" onClick={refreshIndexStatus}>
+            Refresh Status
+          </button>
+          <button className="btn btn--accent" type="button" onClick={onBuildIndex} disabled={!selectedSourceId}>
+            Build Index (selected source)
+          </button>
+        </div>
+        {indexStatus ? (
+          <p className="hint">
+            ready={String(indexStatus.ready)}; chunks={indexStatus.chunk_count}; model={indexStatus.model ?? "NULL"}; dims=
+            {indexStatus.dims ?? "NULL"}; updated_at={indexStatus.updated_at ?? "NULL"}
+          </p>
+        ) : (
+          <p className="hint">Status not loaded.</p>
+        )}
       </div>
     </section>
   );

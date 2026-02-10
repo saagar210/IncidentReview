@@ -1668,3 +1668,46 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 
 6) Next steps
 - Implement embeddings abstraction + index build/update flow in `crates/qir_ai` (unit tests must not require a running Ollama instance).
+
+---
+
+## 2026-02-10 - Phase 5 DS2: Local embeddings + index build/update
+
+1) Done: what changed + why
+- Added an embeddings abstraction (`Embedder`) with an Ollama-backed implementation (`OllamaEmbedder`) that uses the existing strict localhost-only `OllamaClient`.
+- Implemented a local index store that embeds evidence chunks and persists:
+  - `index/index_status.json`
+  - `index/index_vectors.json` (stable, deterministic ordering via `BTreeMap`)
+- Added thin Tauri commands to build and inspect index status, and extended the AI UI section with an Index card.
+- Added unit tests for index building using a mock embedder (no runtime Ollama dependency in the test suite).
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/embeddings/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/embeddings/ollama_embed.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/evidence/index.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/evidence/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/lib.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/ollama.rs
+- /Users/d/Projects/IncidentReview/crates/qir_ai/tests/index_build.rs
+- /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs
+- /Users/d/Projects/IncidentReview/src/lib/schemas.ts
+- /Users/d/Projects/IncidentReview/src/features/ai/AiSection.tsx
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- The Ollama embeddings endpoint is integrated based on the common `/api/embeddings` contract; if a user's Ollama version differs, health checks will still pass but embeddings may fail with `AI_EMBEDDINGS_FAILED` (surface guidance in DS5).
+
+5) Status: current phase + complete / in progress / blocked
+- Phase 5 DS2: complete (index build/status).
+- Phase 5 DS3: next (retrieval API: top-k hits + citations).
+
+6) Next steps
+- Implement retrieval API and Tauri/UI wiring for top-k evidence hits with stable ordering and citation objects.

@@ -74,4 +74,8 @@ impl OllamaClient {
             .with_retryable(true)),
         }
     }
+
+    pub fn base_url(&self) -> &str {
+        self.base_url.as_str()
+    }
 }

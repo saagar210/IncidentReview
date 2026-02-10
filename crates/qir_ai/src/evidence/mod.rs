@@ -1,4 +1,5 @@
 pub mod chunking;
+pub mod index;
 pub mod model;
 pub mod store;
 
@@ -7,4 +8,4 @@ pub use model::{
     EvidenceSource, EvidenceSourceType, EvidenceTimeRange,
 };
 pub use store::{BuildChunksResult, EvidenceAddSourceInput, EvidenceQueryStore, EvidenceStore};
-
+pub use index::{AiIndexBuildInput, AiIndexStatus, IndexStore};

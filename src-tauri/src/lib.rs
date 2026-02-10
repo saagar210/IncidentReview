@@ -8,7 +8,9 @@ use qir_ai::evidence::{
     EvidenceChunkSummary as AiEvidenceChunkSummary, EvidenceOrigin as AiEvidenceOrigin,
     EvidenceQueryStore as AiEvidenceQueryStore, EvidenceSource as AiEvidenceSource,
     EvidenceSourceType as AiEvidenceSourceType, EvidenceStore as AiEvidenceStore,
+    AiIndexBuildInput as AiIndexBuildInput, AiIndexStatus as AiIndexStatus, IndexStore as AiIndexStore,
 };
+use qir_ai::embeddings::ollama_embed::OllamaEmbedder;
 use qir_core::analytics::{DashboardPayloadV1, DashboardPayloadV2};
 use qir_core::backup::{BackupCreateResult, BackupManifest, RestoreResult};
 use qir_core::demo::seed_demo_dataset as core_seed_demo_dataset;
@@ -57,6 +59,13 @@ pub struct EvidenceAddSourceRequest {
     pub origin: AiEvidenceOrigin,
     pub label: String,
     pub text: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiIndexBuildRequest {
+    pub model: String,
+    pub source_id: Option<String>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -187,6 +196,11 @@ fn ai_store_root(app: &tauri::AppHandle) -> Result<PathBuf, AppError> {
             .with_details(format!("path={}; err={}", root.display(), e))
     })?;
     Ok(root)
+}
+
+fn ai_embedder() -> Result<OllamaEmbedder, AppError> {
+    let client = OllamaClient::new("http://127.0.0.1:11434")?;
+    Ok(OllamaEmbedder::new(client))
 }
 
 fn now_rfc3339_utc() -> Result<String, AppError> {
@@ -518,6 +532,31 @@ fn ai_evidence_list_chunks(
 }
 
 #[tauri::command]
+fn ai_index_status(app: tauri::AppHandle) -> Result<AiIndexStatus, AppError> {
+    let root = ai_store_root(&app)?;
+    let index = AiIndexStore::open(root);
+    index.status()
+}
+
+#[tauri::command]
+fn ai_index_build(app: tauri::AppHandle, req: AiIndexBuildRequest) -> Result<AiIndexStatus, AppError> {
+    let root = ai_store_root(&app)?;
+    let evidence = AiEvidenceStore::open(root.clone());
+    let index = AiIndexStore::open(root);
+    let embedder = ai_embedder()?;
+    let updated_at = now_rfc3339_utc()?;
+    index.build_with_embedder(
+        &evidence,
+        &embedder,
+        AiIndexBuildInput {
+            model: req.model,
+            source_id: req.source_id,
+            updated_at,
+        },
+    )
+}
+
+#[tauri::command]
 fn backup_create(app: tauri::AppHandle, destination_dir: String) -> Result<BackupCreateResult, AppError> {
     let state = app.state::<WorkspaceState>();
     let db_path = resolve_current_db_path(&app, &state)?;
@@ -649,6 +688,8 @@ pub fn run() {
             ai_evidence_list_sources,
             ai_evidence_build_chunks,
             ai_evidence_list_chunks,
+            ai_index_status,
+            ai_index_build,
             backup_create,
             backup_inspect,
             restore_from_backup,

@@ -1,4 +1,5 @@
 pub mod evidence;
+pub mod embeddings;
 pub mod guardrails;
 pub mod ollama;
 

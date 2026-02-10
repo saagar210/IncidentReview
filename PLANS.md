@@ -80,7 +80,8 @@ These are required by `AGENTS.md`:
 - Phase 2/3/4 initial vertical slice exists: versioned dashboard payloads + ECharts UI + drill-down table, deterministic Markdown report generation with a golden fixture, and thin Tauri commands.
 - Phase 4 productization work is in place: unified `AppError` contract end-to-end, DS5/DS6/DS7 flows are navigable and UI code is split into feature modules under `src/features/*`.
 - Phase 5 has started (foundations only): Ollama localhost-only health checks, evidence store, and citation enforcement guardrail.
-- Phase 5 DS1 is in progress: evidence sources + deterministic chunking + local store + thin Tauri commands + minimal UI section (no embeddings/retrieval/drafting yet).
+- Phase 5 DS1 is complete: evidence sources + deterministic chunking + local store + thin Tauri commands + minimal UI section.
+- Phase 5 DS2 is in progress: local embeddings + index build/update (still no retrieval/drafting yet).
 - Deliverable Set 1 is complete: Jira CSV import UX + mapping profile CRUD + profile-based import with inserted/updated/skipped + warnings + conflict surfacing.
 - Deliverable Set 2 is complete: Slack ingest UX + deterministic timestamp normalization contract (raw preservation) + Validation/Anomalies UI baseline.
 - Deliverable Set 3 is complete: dashboards expansion (Detection/Response/Vendor-Service) + deterministic QIR report v1 + incident drill-down detail UX.

@@ -216,6 +216,14 @@ export const BuildChunksResultSchema = z.object({
   updated_at: z.string(),
 });
 
+export const AiIndexStatusSchema = z.object({
+  ready: z.boolean(),
+  model: z.string().nullable().optional(),
+  dims: z.number().int().nonnegative().nullable().optional(),
+  chunk_count: z.number().int().nonnegative(),
+  updated_at: z.string().nullable().optional(),
+});
+
 export const DeleteResponseSchema = z.object({
   ok: z.boolean(),
 });
