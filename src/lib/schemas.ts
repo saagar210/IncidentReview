@@ -227,6 +227,26 @@ export const SanitizedExportResultSchema = z.object({
   incident_count: z.number().int().nonnegative(),
 });
 
+export const SanitizedFileInfoSchema = z.object({
+  filename: z.string(),
+  bytes: z.number().int().nonnegative(),
+  sha256: z.string(),
+});
+
+export const SanitizedExportManifestSchema = z.object({
+  manifest_version: z.number().int(),
+  app_version: z.string(),
+  export_time: z.string(),
+  incident_count: z.number().int().nonnegative(),
+  files: z.array(SanitizedFileInfoSchema),
+});
+
+export const SanitizedImportSummarySchema = z.object({
+  inserted_incidents: z.number().int().nonnegative(),
+  inserted_timeline_events: z.number().int().nonnegative(),
+  import_warnings: z.array(ValidationWarningSchema),
+});
+
 export const SlackPreviewSchema = z.object({
   detected_format: z.string(),
   line_count: z.number().int().nonnegative(),

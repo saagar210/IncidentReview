@@ -1060,3 +1060,37 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 
 6) Next steps
 - Add UI flow for sanitized dataset import: directory picker, manifest preview, import trigger + results display, and refresh existing views by re-calling commands.
+
+---
+
+## 2026-02-10 - DS5 (in progress): UI flow for sanitized dataset import (preview + import + refresh)
+
+1) Done: what changed + why
+- Added a deterministic “Import Sanitized Dataset” UI flow:
+  - Directory picker to select a sanitized dataset export folder.
+  - Manifest preview via `inspect_sanitized_dataset` (manifest version + incident count + file list).
+  - Import trigger via `import_sanitized_dataset` and results display (insert counts + explicit import warnings).
+  - Refreshes incident list, dashboards, report, and validation views by re-calling existing commands (UI remains render-only).
+- Surfaced intentional redaction in incident detail timeline events: `(redacted)` is shown when event text is `[REDACTED]` or the event `raw_json` contains `\"text_redacted\":true`.
+- Added runtime validation (Zod) schemas for the new sanitized manifest and import summary payloads.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/src/lib/schemas.ts
+- /Users/d/Projects/IncidentReview/src/App.tsx
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- None for DS5 import correctness. The UI currently detects the “DB not empty” hard fail by matching the formatted error string; a future improvement would be passing typed errors across the boundary (still preserving `AppError` shape).
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 5: in progress.
+
+6) Next steps
+- Update `PLANS.md` to mark DS5 complete and add a DS5 completion log entry after final verification.

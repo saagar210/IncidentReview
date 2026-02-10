@@ -18,7 +18,9 @@ import {
   BackupCreateResultSchema,
   BackupManifestSchema,
   RestoreResultSchema,
+  SanitizedExportManifestSchema,
   SanitizedExportResultSchema,
+  SanitizedImportSummarySchema,
   SlackPreviewSchema,
   SlackIngestSummarySchema,
   ValidationReportSchema,
@@ -192,6 +194,20 @@ export default function App() {
   );
 
   const [sanitizedExport, setSanitizedExport] = useState<null | { export_dir: string; incident_count: number }>(null);
+
+  const [sanitizedImportDir, setSanitizedImportDir] = useState<string>("");
+  const [sanitizedImportManifest, setSanitizedImportManifest] = useState<null | {
+    manifest_version: number;
+    app_version: string;
+    export_time: string;
+    incident_count: number;
+    files: Array<{ filename: string; bytes: number; sha256: string }>;
+  }>(null);
+  const [sanitizedImportSummary, setSanitizedImportSummary] = useState<null | {
+    inserted_incidents: number;
+    inserted_timeline_events: number;
+    import_warnings: Array<{ code: string; message: string; details?: string | null }>;
+  }>(null);
 
   const [incidentDetailOpen, setIncidentDetailOpen] = useState<boolean>(false);
   const [incidentDetailLoading, setIncidentDetailLoading] = useState<boolean>(false);
@@ -741,6 +757,63 @@ export default function App() {
     }
   }
 
+  async function onPickSanitizedDatasetForImport() {
+    try {
+      const dir = await pickDirectory();
+      if (!dir) return;
+      setSanitizedImportDir(dir);
+      setSanitizedImportSummary(null);
+      const manifest = await invokeValidated("inspect_sanitized_dataset", { datasetDir: dir }, SanitizedExportManifestSchema);
+      setSanitizedImportManifest(manifest);
+      pushToast({
+        kind: "success",
+        title: "Sanitized dataset selected",
+        message: `${manifest.export_time} (incidents=${manifest.incident_count})`,
+      });
+    } catch (e) {
+      setSanitizedImportDir("");
+      setSanitizedImportManifest(null);
+      setSanitizedImportSummary(null);
+      pushToast({ kind: "error", title: "Inspect sanitized dataset failed", message: String(e) });
+    }
+  }
+
+  async function onImportSanitizedDataset() {
+    try {
+      if (!sanitizedImportDir || !sanitizedImportManifest) {
+        pushToast({ kind: "error", title: "No dataset selected", message: "Pick a sanitized dataset folder first." });
+        return;
+      }
+
+      const res = await invokeValidated(
+        "import_sanitized_dataset",
+        { datasetDir: sanitizedImportDir },
+        SanitizedImportSummarySchema
+      );
+      setSanitizedImportSummary(res);
+
+      const warnCount = res.import_warnings.length;
+      pushToast({
+        kind: warnCount > 0 ? "warning" : "success",
+        title: "Sanitized import complete",
+        message: `incidents=${res.inserted_incidents} events=${res.inserted_timeline_events} warnings=${warnCount}`,
+      });
+
+      // Refresh views: UI renders only server-provided datasets.
+      await onRefreshIncidentsList();
+      await onLoadDashboard();
+      await onGenerateReport();
+      await onRefreshValidationReport();
+    } catch (e) {
+      const msg = String(e);
+      const guidance =
+        msg.includes("INGEST_SANITIZED_DB_NOT_EMPTY") ?
+          "\n\nThis import refuses to run on a non-empty DB. Restore/seed into a fresh DB first, then retry." :
+          "";
+      pushToast({ kind: "error", title: "Sanitized import failed", message: msg + guidance });
+    }
+  }
+
   async function onRefreshIncidentsList() {
     try {
       const res = await invokeValidated("incidents_list", undefined, IncidentListSchema);
@@ -939,6 +1012,9 @@ export default function App() {
                     <ul className="list">
                       {incidentDetail.timeline_events.map((e) => (
                         <li key={e.id}>
+                          {e.text === "[REDACTED]" || (e.raw_json && e.raw_json.includes('"text_redacted":true')) ? (
+                            <span className="muted">(redacted)</span>
+                          ) : null}{" "}
                           <span className="mono">{e.ts ?? "UNKNOWN_TS"}</span>{" "}
                           <span className="muted">({e.source})</span>: {e.text}
                         </li>
@@ -1051,11 +1127,26 @@ export default function App() {
           <button className="btn" type="button" onClick={onExportSanitizedDataset}>
             Export Sanitized Dataset...
           </button>
+          <button className="btn" type="button" onClick={onPickSanitizedDatasetForImport}>
+            Pick Sanitized Dataset...
+          </button>
+          <button
+            className="btn btn--accent"
+            type="button"
+            onClick={onImportSanitizedDataset}
+            disabled={!sanitizedImportManifest}
+          >
+            Import Sanitized Dataset
+          </button>
         </div>
         <p className="hint">
           Backups are exported as folders containing <span className="mono">incidentreview.sqlite</span> and{" "}
           <span className="mono">manifest.json</span> (no zip by default). Restore requires explicit overwrite
           confirmation and validates DB hashes from the manifest.
+        </p>
+        <p className="hint">
+          Sanitized import is deterministic and refuses to run on a non-empty DB. If you already have local data, restore
+          a fresh DB first.
         </p>
 
         {sanitizedExport && (
@@ -1070,6 +1161,68 @@ export default function App() {
             <p className="hint">
               Free-text fields (Slack text, notes) are redacted; categories are pseudonymized deterministically for sharing.
             </p>
+          </section>
+        )}
+
+        {sanitizedImportManifest && (
+          <section className="card">
+            <h2>Sanitized Import Preview</h2>
+            <p className="hint">
+              Selected: <span className="mono">{sanitizedImportDir}</span>
+            </p>
+            <ul className="list">
+              <li>
+                Export time: <span className="mono">{sanitizedImportManifest.export_time}</span>
+              </li>
+              <li>
+                App version: <span className="mono">{sanitizedImportManifest.app_version}</span>
+              </li>
+              <li>
+                Incidents: <span className="mono">{sanitizedImportManifest.incident_count}</span>
+              </li>
+              <li>
+                Files:{" "}
+                <span className="mono">
+                  {sanitizedImportManifest.files.map((f) => f.filename).sort().join(", ")}
+                </span>
+              </li>
+            </ul>
+            <p className="hint">
+              On import, incident titles become <span className="mono">Incident INC_###</span> and timeline text becomes{" "}
+              <span className="mono">[REDACTED]</span>.
+            </p>
+          </section>
+        )}
+
+        {sanitizedImportSummary && (
+          <section className="card">
+            <h2>Sanitized Import Result</h2>
+            <ul className="list">
+              <li>
+                Inserted incidents: <span className="mono">{sanitizedImportSummary.inserted_incidents}</span>
+              </li>
+              <li>
+                Inserted events: <span className="mono">{sanitizedImportSummary.inserted_timeline_events}</span>
+              </li>
+              <li>
+                Import warnings: <span className="mono">{sanitizedImportSummary.import_warnings.length}</span>
+              </li>
+            </ul>
+            {sanitizedImportSummary.import_warnings.length > 0 ? (
+              <>
+                <h3>Warnings</h3>
+                <ul className="list">
+                  {sanitizedImportSummary.import_warnings.map((w, idx) => (
+                    <li key={idx}>
+                      <span className="mono">{w.code}</span>: {w.message}{" "}
+                      {w.details ? <span className="mono">({w.details})</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="muted">No import warnings.</p>
+            )}
           </section>
         )}
 
