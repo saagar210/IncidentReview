@@ -999,3 +999,34 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 6) Next steps
 - Add deterministic round-trip tests (seed demo -> sanitized export -> import into fresh DB -> dashboards/report/validation succeed).
 - Wire thin Tauri RPC commands for inspect/import and add a UI flow to import a sanitized dataset folder.
+
+---
+
+## 2026-02-10 - DS5 (in progress): deterministic sanitized export/import round-trip tests
+
+1) Done: what changed + why
+- Added a deterministic round-trip test in `crates/qir_core` that proves the DS5 import contract works end-to-end:
+  - Seed demo dataset -> ingest a Slack event containing a unique sensitive marker -> export sanitized dataset -> import into a fresh DB.
+  - Confirms analytics payloads reconcile to incident totals and report generation succeeds after import.
+  - Defense-in-depth: asserts the sensitive marker does not appear in exported JSON nor in the imported DB.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/sanitized_round_trip.rs
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- None identified for correctness. If the demo seed shape changes later, this test should be updated to assert invariants (counts/reconciliation) rather than brittle exact strings.
+
+5) Status: current phase + complete / in progress / blocked
+- Deliverable Set 5: in progress.
+
+6) Next steps
+- Add thin Tauri commands for sanitized dataset inspect/import (no business logic in `src-tauri`).
+- Add a UI flow to pick a dataset folder, preview the manifest, run import, and refresh dashboards/report/validation.
