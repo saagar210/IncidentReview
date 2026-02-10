@@ -247,6 +247,17 @@ export const SanitizedImportSummarySchema = z.object({
   import_warnings: z.array(ValidationWarningSchema),
 });
 
+export const WorkspaceMetadataSchema = z.object({
+  db_path: z.string(),
+  is_empty: z.boolean(),
+});
+
+export const WorkspaceInfoSchema = z.object({
+  current_db_path: z.string(),
+  recent_db_paths: z.array(z.string()),
+  load_error: AppErrorSchema.nullable().optional(),
+});
+
 export const SlackPreviewSchema = z.object({
   detected_format: z.string(),
   line_count: z.number().int().nonnegative(),

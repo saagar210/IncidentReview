@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ReactECharts from "echarts-for-react";
 import { open } from "@tauri-apps/plugin-dialog";
 
 import { extractAppError, invokeValidated } from "./lib/tauri";
 import { guidanceForSanitizedImportErrorCode } from "./lib/sanitized_import_guidance";
+import { guidanceForWorkspaceErrorCode } from "./lib/workspace_guidance";
 import {
   DashboardPayloadV2Schema,
   InitDbResponseSchema,
@@ -25,6 +26,8 @@ import {
   SlackPreviewSchema,
   SlackIngestSummarySchema,
   ValidationReportSchema,
+  WorkspaceInfoSchema,
+  WorkspaceMetadataSchema,
 } from "./lib/schemas";
 import { ToastHost } from "./ui/ToastHost";
 import { useToasts } from "./ui/useToasts";
@@ -166,6 +169,15 @@ export default function App() {
   const [incidentFilterIds, setIncidentFilterIds] = useState<number[] | null>(null);
   const [incidentFilterLabel, setIncidentFilterLabel] = useState<string>("");
 
+  const [workspaceInfo, setWorkspaceInfo] = useState<null | {
+    current_db_path: string;
+    recent_db_paths: string[];
+    load_error?: { code: string; message: string; details?: string | null; retryable: boolean } | null;
+  }>(null);
+  const [workspaceMeta, setWorkspaceMeta] = useState<null | { db_path: string; is_empty: boolean }>(null);
+  const [workspaceNewFilename, setWorkspaceNewFilename] = useState<string>("incidentreview.sqlite");
+  const [workspaceRecentPick, setWorkspaceRecentPick] = useState<string>("");
+
   const [backupResult, setBackupResult] = useState<null | {
     backup_dir: string;
     manifest: {
@@ -295,6 +307,71 @@ export default function App() {
   const [validationReport, setValidationReport] = useState<
     null | Array<{ id: number; external_id: string | null; title: string; warnings: Array<{ code: string; message: string; details?: string | null }> }>
   >(null);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const info = await invokeValidated("workspace_get_current", undefined, WorkspaceInfoSchema);
+        setWorkspaceInfo(info);
+        setDbPath(info.current_db_path);
+        if (info.recent_db_paths.length > 0) {
+          setWorkspaceRecentPick(info.recent_db_paths[0] ?? "");
+        }
+        if (info.load_error) {
+          pushToast({
+            kind: "warning",
+            title: "Workspace config warning",
+            message: `${info.load_error.code}: ${info.load_error.message}`,
+          });
+        }
+      } catch (e) {
+        pushToast({ kind: "error", title: "Workspace load failed", message: String(e) });
+      }
+
+      // Ensure the current workspace DB is usable. For the default app-data workspace this
+      // creates the DB on first run.
+      try {
+        const res = await invokeValidated("init_db", undefined, InitDbResponseSchema);
+        setDbPath(res.db_path);
+      } catch (e) {
+        const appErr = extractAppError(e);
+        if (appErr) {
+          const guidance = guidanceForWorkspaceErrorCode(appErr.code);
+          pushToast({
+            kind: "error",
+            title: "Workspace init failed",
+            message: guidance ? `${appErr.code}: ${appErr.message}\n\n${guidance}` : `${appErr.code}: ${appErr.message}`,
+          });
+        } else {
+          pushToast({ kind: "error", title: "Workspace init failed", message: String(e) });
+        }
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function clearWorkspaceScopedState() {
+    setSeedInserted(null);
+    setDashboard(null);
+    setSelectedSeverity(null);
+    setIncidentFilterIds(null);
+    setIncidentFilterLabel("");
+    setReportMd("");
+    setValidationReport(null);
+    setIncidentOptions([]);
+    setIncidentDetailOpen(false);
+    setIncidentDetail(null);
+    setImportSummary(null);
+    setBackupResult(null);
+    setRestoreBackupDir("");
+    setRestoreManifest(null);
+    setRestoreAllowOverwrite(false);
+    setRestoreResult(null);
+    setSanitizedExport(null);
+    setSanitizedImportDir("");
+    setSanitizedImportManifest(null);
+    setSanitizedImportSummary(null);
+  }
 
   const filteredIncidents = useMemo(() => {
     if (!dashboard) return [];
@@ -673,6 +750,111 @@ export default function App() {
     if (!res) return null;
     if (Array.isArray(res)) return res[0] ?? null;
     return res;
+  }
+
+  async function pickDbFile(): Promise<string | null> {
+    const res = await open({
+      directory: false,
+      multiple: false,
+      filters: [{ name: "SQLite DB", extensions: ["sqlite", "db"] }],
+    });
+    if (!res) return null;
+    if (Array.isArray(res)) return res[0] ?? null;
+    return res;
+  }
+
+  async function refreshAllViewsAfterWorkspaceChange() {
+    await onRefreshIncidentsList();
+    await onLoadDashboard();
+    await onGenerateReport();
+    await onRefreshValidationReport();
+  }
+
+  async function onWorkspaceCreate() {
+    try {
+      const dest = await pickDirectory();
+      if (!dest) return;
+      clearWorkspaceScopedState();
+      const meta = await invokeValidated(
+        "workspace_create",
+        { destinationDir: dest, filename: workspaceNewFilename || "incidentreview.sqlite" },
+        WorkspaceMetadataSchema
+      );
+      setWorkspaceMeta(meta);
+      setDbPath(meta.db_path);
+      const info = await invokeValidated("workspace_get_current", undefined, WorkspaceInfoSchema);
+      setWorkspaceInfo(info);
+      pushToast({ kind: "success", title: "Workspace created", message: meta.db_path });
+      await refreshAllViewsAfterWorkspaceChange();
+    } catch (e) {
+      const appErr = extractAppError(e);
+      if (appErr) {
+        const guidance = guidanceForWorkspaceErrorCode(appErr.code);
+        pushToast({
+          kind: "error",
+          title: "Workspace create failed",
+          message: guidance ? `${appErr.code}: ${appErr.message}\n\n${guidance}` : `${appErr.code}: ${appErr.message}`,
+        });
+      } else {
+        pushToast({ kind: "error", title: "Workspace create failed", message: String(e) });
+      }
+    }
+  }
+
+  async function onWorkspaceOpen() {
+    try {
+      const file = await pickDbFile();
+      if (!file) return;
+      clearWorkspaceScopedState();
+      const meta = await invokeValidated("workspace_open", { dbPath: file }, WorkspaceMetadataSchema);
+      setWorkspaceMeta(meta);
+      setDbPath(meta.db_path);
+      const info = await invokeValidated("workspace_get_current", undefined, WorkspaceInfoSchema);
+      setWorkspaceInfo(info);
+      pushToast({ kind: "success", title: "Workspace opened", message: meta.db_path });
+      await refreshAllViewsAfterWorkspaceChange();
+    } catch (e) {
+      const appErr = extractAppError(e);
+      if (appErr) {
+        const guidance = guidanceForWorkspaceErrorCode(appErr.code);
+        pushToast({
+          kind: "error",
+          title: "Workspace open failed",
+          message: guidance ? `${appErr.code}: ${appErr.message}\n\n${guidance}` : `${appErr.code}: ${appErr.message}`,
+        });
+      } else {
+        pushToast({ kind: "error", title: "Workspace open failed", message: String(e) });
+      }
+    }
+  }
+
+  async function onWorkspaceSwitchToRecent() {
+    try {
+      if (!workspaceRecentPick) {
+        pushToast({ kind: "error", title: "No workspace selected", message: "Pick a recent workspace first." });
+        return;
+      }
+      clearWorkspaceScopedState();
+      const meta = await invokeValidated("workspace_open", { dbPath: workspaceRecentPick }, WorkspaceMetadataSchema);
+      setWorkspaceMeta(meta);
+      setDbPath(meta.db_path);
+      const info = await invokeValidated("workspace_get_current", undefined, WorkspaceInfoSchema);
+      setWorkspaceInfo(info);
+      pushToast({ kind: "success", title: "Workspace switched", message: meta.db_path });
+      await refreshAllViewsAfterWorkspaceChange();
+    } catch (e) {
+      const appErr = extractAppError(e);
+      if (appErr) {
+        const guidance = guidanceForWorkspaceErrorCode(appErr.code);
+        pushToast({
+          kind: "error",
+          title: "Workspace switch failed",
+          message: guidance ? `${appErr.code}: ${appErr.message}\n\n${guidance}` : `${appErr.code}: ${appErr.message}`,
+        });
+      } else {
+        pushToast({ kind: "error", title: "Workspace switch failed", message: String(e) });
+      }
+    }
   }
 
   async function onBackupCreate() {
@@ -1073,6 +1255,9 @@ export default function App() {
       <nav className="card">
         <h2>Jump To</h2>
         <div className="actions">
+          <a className="btn" href="#workspace">
+            Workspace
+          </a>
           <a className="btn" href="#jira">
             Jira Import
           </a>
@@ -1118,6 +1303,50 @@ export default function App() {
           This app does not compute metrics in the UI. Dashboards and report data are computed in{" "}
           <code>crates/qir_core</code>.
         </p>
+      </section>
+
+      <section className="card" id="workspace">
+        <h2>Workspace (Create / Open / Switch)</h2>
+        <p className="hint">
+          A workspace is a local SQLite DB file. Switching workspaces reloads all data (incidents, dashboards, validation, report) from the selected DB.
+        </p>
+        <p className="hint">
+          Current: <span className="mono">{workspaceInfo?.current_db_path ?? dbPath ?? "unknown"}</span>
+        </p>
+        {workspaceMeta ? (
+          <p className="hint">
+            Status: <span className="mono">{workspaceMeta.is_empty ? "empty" : "non-empty"}</span>
+          </p>
+        ) : null}
+
+        <div className="actions">
+          <button className="btn" type="button" onClick={onWorkspaceOpen}>
+            Open Workspace DB...
+          </button>
+          <input
+            className="textInput"
+            value={workspaceNewFilename}
+            onChange={(e) => setWorkspaceNewFilename(e.currentTarget.value)}
+            placeholder="New DB filename (e.g. incidentreview.sqlite)"
+          />
+          <button className="btn btn--accent" type="button" onClick={onWorkspaceCreate}>
+            Create New Workspace...
+          </button>
+        </div>
+
+        <div className="actions">
+          <select className="select" value={workspaceRecentPick} onChange={(e) => setWorkspaceRecentPick(e.currentTarget.value)}>
+            <option value="">(no recent workspaces)</option>
+            {(workspaceInfo?.recent_db_paths ?? []).map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+          <button className="btn" type="button" onClick={onWorkspaceSwitchToRecent} disabled={!workspaceRecentPick}>
+            Switch To Selected
+          </button>
+        </div>
       </section>
 
       <section className="card" id="data">

@@ -170,7 +170,19 @@ fn now_rfc3339_utc() -> Result<String, AppError> {
 fn init_db(app: tauri::AppHandle) -> Result<InitDbResponse, AppError> {
     let state = app.state::<WorkspaceState>();
     let db_path = resolve_current_db_path(&app, &state)?;
-    let _conn = qir_core::workspace::open_workspace_connection(&db_path)?;
+    let default_path = default_db_path(&app)?;
+    let _conn = if db_path.exists() {
+        qir_core::workspace::open_workspace_connection(&db_path)?
+    } else if db_path == default_path {
+        // First-run convenience: create the default app-data workspace on demand.
+        qir_core::workspace::create_workspace_connection(&db_path)?
+    } else {
+        return Err(AppError::new(
+            "WORKSPACE_DB_NOT_FOUND",
+            "Workspace database file not found",
+        )
+        .with_details(db_path.display().to_string()));
+    };
     Ok(InitDbResponse {
         db_path: db_path.to_string_lossy().to_string(),
     })

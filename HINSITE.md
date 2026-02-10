@@ -1340,3 +1340,47 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 6) Next steps
 - Add minimal Workspace UX in the frontend (create/open/switch) and ensure all screens refresh from the new DB after switching.
 - Add frontend tests for “switch triggers reload” behavior.
+
+---
+
+## 2026-02-10 - DS6 (in progress): Workspace UI (create/open/switch) + refresh discipline + frontend tests
+
+1) Done: what changed + why
+- Implemented minimal Workspace UX in the frontend so DS5’s “sanitized import requires empty DB” is practical:
+  - Workspace card shows current DB path and whether the workspace is empty.
+  - Create workspace: directory picker + filename input -> `workspace_create`.
+  - Open workspace: file picker -> `workspace_open`.
+  - Switch: select from recent list -> `workspace_open`.
+- Implemented refresh discipline after switching:
+  - Clears workspace-scoped UI state to avoid stale data (dashboard, report, validation, incident lists, prior import/export results).
+  - Reloads incidents list, dashboards, validation/anomalies, and report from the newly selected workspace DB.
+- Added code-based workspace error guidance:
+  - UI branches on `AppError.code` (never message substrings), using deterministic guidance per code.
+- Added a lightweight frontend test proving the workspace switch flow requests fresh backend data in the expected sequence.
+- Improved first-run behavior: `init_db` now creates the *default* app-data workspace DB on demand if missing, while still refusing to silently create missing user-selected workspace files.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/src/App.tsx
+- /Users/d/Projects/IncidentReview/src/lib/schemas.ts
+- /Users/d/Projects/IncidentReview/src/lib/workspace_flow.ts
+- /Users/d/Projects/IncidentReview/src/lib/workspace_flow.test.ts
+- /Users/d/Projects/IncidentReview/src/lib/workspace_guidance.ts
+- /Users/d/Projects/IncidentReview/src/lib/workspace_guidance.test.ts
+- /Users/d/Projects/IncidentReview/src-tauri/src/lib.rs
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Workspace UI is intentionally minimal. If we later add “recent workspace cleanup” or “workspace rename labels”, keep it local-only and avoid any telemetry.
+
+5) Status: current phase + complete / in progress / blocked
+- DS6: in progress.
+
+6) Next steps
+- Mark DS6 complete in `PLANS.md` after final scenario verification + `rg` checks and repo hygiene.
