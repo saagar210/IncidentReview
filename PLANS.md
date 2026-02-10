@@ -84,7 +84,8 @@ These are required by `AGENTS.md`:
 - Phase 5 DS2 is complete: local embeddings + index build/update.
 - Phase 5 DS3 is complete: retrieval API (top-k evidence hits + citations).
 - Phase 5 DS4 is complete: drafting with mandatory citations (hard fail if missing/invalid).
-- Phase 5 DS5 is in progress: UI gating flow + AI Draft screen (end-to-end UX).
+- Phase 5 DS5 is complete: UI gating flow + AI Draft screen (end-to-end UX).
+- Phase 5 is now shippable end-to-end: evidence -> chunks -> embeddings index -> retrieval -> citation-enforced drafting (local-only via Ollama on 127.0.0.1).
 - Deliverable Set 1 is complete: Jira CSV import UX + mapping profile CRUD + profile-based import with inserted/updated/skipped + warnings + conflict surfacing.
 - Deliverable Set 2 is complete: Slack ingest UX + deterministic timestamp normalization contract (raw preservation) + Validation/Anomalies UI baseline.
 - Deliverable Set 3 is complete: dashboards expansion (Detection/Response/Vendor-Service) + deterministic QIR report v1 + incident drill-down detail UX.

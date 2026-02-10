@@ -66,12 +66,11 @@ impl OllamaClient {
                 AppError::new("AI_OLLAMA_UNHEALTHY", "Ollama health check failed")
                     .with_details(format!("status={}", r.status())),
             ),
-            Err(e) => Err(AppError::new(
-                "AI_OLLAMA_UNREACHABLE",
-                "Failed to reach Ollama on 127.0.0.1",
-            )
-            .with_details(e.to_string())
-            .with_retryable(true)),
+            Err(e) => Err(
+                AppError::new("AI_OLLAMA_UNHEALTHY", "Failed to reach Ollama on 127.0.0.1")
+                    .with_details(e.to_string())
+                    .with_retryable(true),
+            ),
         }
     }
 

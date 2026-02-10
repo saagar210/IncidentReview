@@ -1798,3 +1798,43 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 
 6) Next steps
 - Implement explicit UI gating states (health/evidence/chunks/index) and a more intentional “AI Draft” screen experience, without adding new Tauri commands.
+
+---
+
+## 2026-02-10 - Phase 5 DS5: UI gating flow + AI Draft screen (end-to-end)
+
+1) Done: what changed + why
+- Implemented explicit UI gating for the AI flow:
+  - health check (Ollama on 127.0.0.1 only)
+  - evidence sources present
+  - chunks built
+  - index built
+  - citations selected before drafting
+- Added code-based user guidance for Phase 5 error codes and a small pure gating helper with unit tests (no message substring matching).
+- Hardened Ollama health errors to use the canonical `AI_OLLAMA_UNHEALTHY` code (instead of separate unreachable variants) to keep UI gating deterministic.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/src/lib/ai_guidance.ts
+- /Users/d/Projects/IncidentReview/src/features/ai/ai_gating.ts
+- /Users/d/Projects/IncidentReview/src/features/ai/ai_gating.test.ts
+- /Users/d/Projects/IncidentReview/src/features/ai/AiSection.tsx
+- /Users/d/Projects/IncidentReview/crates/qir_ai/src/ollama.rs
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- Drafting still uses a fixed default model name (`llama3`). If not installed, drafting will fail with `AI_DRAFT_FAILED`; a future enhancement could list installed models and let the user select (would require a new thin command).
+
+5) Status: current phase + complete / in progress / blocked
+- Phase 5 DS5: complete.
+- Phase 5: end-to-end slice complete and shippable (local-only, evidence-first, citation enforced).
+
+6) Next steps
+- Optional polish: add a “list installed Ollama models” command and a UI selector; keep it thin and localhost-only.

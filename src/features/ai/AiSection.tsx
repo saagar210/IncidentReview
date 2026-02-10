@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { invokeValidated, extractAppError } from "../../lib/tauri";
 import {
   AiDraftResponseSchema,
+  AiHealthStatusSchema,
   AiIndexStatusSchema,
   BuildChunksResultSchema,
   EvidenceQueryResponseSchema,
@@ -10,6 +11,8 @@ import {
   EvidenceSourceListSchema,
 } from "../../lib/schemas";
 import { pickDirectory, pickTextFile } from "../../lib/pickers";
+import { guidanceForAiErrorCode } from "../../lib/ai_guidance";
+import { computeAiGate } from "./ai_gating";
 
 type EvidenceSourceType = "sanitized_export" | "slack_transcript" | "incident_report_md" | "freeform_text";
 
@@ -20,6 +23,12 @@ function defaultOriginKindForType(t: EvidenceSourceType): "file" | "directory" |
 }
 
 export function AiSection(props: { onToast: (t: { kind: "success" | "error"; title: string; message: string }) => void }) {
+  const { onToast } = props;
+
+  const [healthOk, setHealthOk] = useState<boolean | null>(null);
+  const [healthMessage, setHealthMessage] = useState<string>("");
+  const [healthErrorCode, setHealthErrorCode] = useState<string | null>(null);
+
   const [sources, setSources] = useState<Array<{ source_id: string; type: EvidenceSourceType; origin: { kind: string; path?: string | null }; label: string; created_at: string }>>(
     []
   );
@@ -68,12 +77,45 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
 
   const originKind = useMemo(() => defaultOriginKindForType(addType), [addType]);
 
+  const gate = useMemo(() => {
+    return computeAiGate({
+      healthOk,
+      sourcesCount: sources.length,
+      chunksCount: chunks.length,
+      indexReady: indexStatus?.ready ?? null,
+      selectedCitationsCount: selectedCitationChunkIds.length,
+    });
+  }, [healthOk, sources.length, chunks.length, indexStatus?.ready, selectedCitationChunkIds.length]);
+
   useEffect(() => {
     if (addType === "sanitized_export") setAddLabel("Sanitized export");
     else if (addType === "slack_transcript") setAddLabel("Slack transcript");
     else if (addType === "incident_report_md") setAddLabel("Incident report (MD)");
     else setAddLabel("Freeform text");
   }, [addType]);
+
+  const runHealthCheck = useCallback(async (toast: boolean) => {
+    try {
+      const res = await invokeValidated("ai_health_check", undefined, AiHealthStatusSchema);
+      setHealthOk(true);
+      setHealthErrorCode(null);
+      setHealthMessage(res.message);
+      if (toast) onToast({ kind: "success", title: "AI OK", message: res.message });
+    } catch (e) {
+      const appErr = extractAppError(e);
+      setHealthOk(false);
+      setHealthErrorCode(appErr?.code ?? "AI_OLLAMA_UNHEALTHY");
+      setHealthMessage(appErr ? `${appErr.code}: ${appErr.message}` : String(e));
+      if (toast) {
+        const guidance = appErr ? guidanceForAiErrorCode(appErr.code) : null;
+        onToast({
+          kind: "error",
+          title: "AI unavailable",
+          message: appErr && guidance ? `${appErr.code}: ${appErr.message}\n\n${guidance}` : String(e),
+        });
+      }
+    }
+  }, [onToast]);
 
   async function refreshSources() {
     const res = await invokeValidated("ai_evidence_list_sources", undefined, EvidenceSourceListSchema);
@@ -93,14 +135,28 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
   useEffect(() => {
     void (async () => {
       try {
+        await runHealthCheck(false);
         const res = await invokeValidated("ai_evidence_list_sources", undefined, EvidenceSourceListSchema);
         setSources(res);
         setSelectedSourceId((cur) => cur || (res.length > 0 ? res[0].source_id : ""));
+        const st = await invokeValidated("ai_index_status", undefined, AiIndexStatusSchema);
+        setIndexStatus(st);
       } catch {
         // Don't toast on first-load failure; this screen is gated later by health/index status.
       }
     })();
-  }, []);
+  }, [runHealthCheck]);
+
+  useEffect(() => {
+    if (!selectedSourceId) return;
+    void (async () => {
+      try {
+        await refreshChunks(selectedSourceId);
+      } catch {
+        // ignore
+      }
+    })();
+  }, [selectedSourceId]);
 
   async function onPickPath() {
     try {
@@ -114,7 +170,7 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
         setAddPath(file);
       }
     } catch (e) {
-      props.onToast({ kind: "error", title: "Picker failed", message: String(e) });
+      onToast({ kind: "error", title: "Picker failed", message: String(e) });
     }
   }
 
@@ -142,13 +198,14 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
       // res is an EvidenceSource; avoid schema churn here and just refresh from list endpoint.
       void res;
       await refreshSources();
-      props.onToast({ kind: "success", title: "Evidence source added", message: addLabel });
+      onToast({ kind: "success", title: "Evidence source added", message: addLabel });
     } catch (e) {
       const appErr = extractAppError(e);
-      props.onToast({
+      const guidance = appErr ? guidanceForAiErrorCode(appErr.code) : null;
+      onToast({
         kind: "error",
         title: "Add evidence failed",
-        message: appErr ? `${appErr.code}: ${appErr.message}` : String(e),
+        message: appErr && guidance ? `${appErr.code}: ${appErr.message}\n\n${guidance}` : appErr ? `${appErr.code}: ${appErr.message}` : String(e),
       });
     }
   }
@@ -160,7 +217,7 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
         { sourceId: selectedSourceId || null },
         BuildChunksResultSchema
       );
-      props.onToast({
+      onToast({
         kind: "success",
         title: "Chunks built",
         message: `chunk_count=${res.chunk_count}; updated_at=${res.updated_at}`,
@@ -168,10 +225,11 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
       await refreshChunks(selectedSourceId || null);
     } catch (e) {
       const appErr = extractAppError(e);
-      props.onToast({
+      const guidance = appErr ? guidanceForAiErrorCode(appErr.code) : null;
+      onToast({
         kind: "error",
         title: "Build chunks failed",
-        message: appErr ? `${appErr.code}: ${appErr.message}` : String(e),
+        message: appErr && guidance ? `${appErr.code}: ${appErr.message}\n\n${guidance}` : appErr ? `${appErr.code}: ${appErr.message}` : String(e),
       });
     }
   }
@@ -189,17 +247,18 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
         AiIndexStatusSchema
       );
       setIndexStatus(st);
-      props.onToast({
+      onToast({
         kind: "success",
         title: "Index built",
         message: `ready=${st.ready}; chunks=${st.chunk_count}; model=${st.model ?? "unknown"}`,
       });
     } catch (e) {
       const appErr = extractAppError(e);
-      props.onToast({
+      const guidance = appErr ? guidanceForAiErrorCode(appErr.code) : null;
+      onToast({
         kind: "error",
         title: "Build index failed",
-        message: appErr ? `${appErr.code}: ${appErr.message}` : String(e),
+        message: appErr && guidance ? `${appErr.code}: ${appErr.message}\n\n${guidance}` : appErr ? `${appErr.code}: ${appErr.message}` : String(e),
       });
     }
   }
@@ -218,13 +277,14 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
         EvidenceQueryResponseSchema
       );
       setSearchHits(res.hits);
-      props.onToast({ kind: "success", title: "Search complete", message: `${res.hits.length} hits` });
+      onToast({ kind: "success", title: "Search complete", message: `${res.hits.length} hits` });
     } catch (e) {
       const appErr = extractAppError(e);
-      props.onToast({
+      const guidance = appErr ? guidanceForAiErrorCode(appErr.code) : null;
+      onToast({
         kind: "error",
         title: "Search failed",
-        message: appErr ? `${appErr.code}: ${appErr.message}` : String(e),
+        message: appErr && guidance ? `${appErr.code}: ${appErr.message}\n\n${guidance}` : appErr ? `${appErr.code}: ${appErr.message}` : String(e),
       });
     }
   }
@@ -232,13 +292,14 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
   async function onListChunks() {
     try {
       await refreshChunks(selectedSourceId || null);
-      props.onToast({ kind: "success", title: "Chunks loaded", message: `${chunks.length} chunks` });
+      onToast({ kind: "success", title: "Chunks loaded", message: `${chunks.length} chunks` });
     } catch (e) {
       const appErr = extractAppError(e);
-      props.onToast({
+      const guidance = appErr ? guidanceForAiErrorCode(appErr.code) : null;
+      onToast({
         kind: "error",
         title: "List chunks failed",
-        message: appErr ? `${appErr.code}: ${appErr.message}` : String(e),
+        message: appErr && guidance ? `${appErr.code}: ${appErr.message}\n\n${guidance}` : appErr ? `${appErr.code}: ${appErr.message}` : String(e),
       });
     }
   }
@@ -259,13 +320,14 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
       );
       setDraftMarkdown(res.markdown);
       setDraftCitations(res.citations);
-      props.onToast({ kind: "success", title: "Draft complete", message: `citations=${res.citations.length}` });
+      onToast({ kind: "success", title: "Draft complete", message: `citations=${res.citations.length}` });
     } catch (e) {
       const appErr = extractAppError(e);
-      props.onToast({
+      const guidance = appErr ? guidanceForAiErrorCode(appErr.code) : null;
+      onToast({
         kind: "error",
         title: "Draft failed",
-        message: appErr ? `${appErr.code}: ${appErr.message}` : String(e),
+        message: appErr && guidance ? `${appErr.code}: ${appErr.message}\n\n${guidance}` : appErr ? `${appErr.code}: ${appErr.message}` : String(e),
       });
     }
   }
@@ -277,6 +339,39 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
         Phase 5 is local-only (Ollama on 127.0.0.1). AI must never compute deterministic metrics; it can only draft text
         with citations to evidence chunks.
       </p>
+
+      <div className="card card--sub">
+        <h3>Preflight / Gating</h3>
+        <p className="hint">Actions are gated by local health and index readiness. The app never calls external APIs.</p>
+        <div className="actions">
+          <button className="btn btn--accent" type="button" onClick={() => runHealthCheck(true)}>
+            Health Check (Ollama)
+          </button>
+          <button className="btn" type="button" onClick={refreshSources}>
+            Refresh Sources
+          </button>
+          <button className="btn" type="button" onClick={refreshIndexStatus}>
+            Refresh Index Status
+          </button>
+        </div>
+        <p className="hint">
+          healthOk={String(healthOk)}; sources={sources.length}; chunks(selected)={chunks.length}; indexReady=
+          {String(indexStatus?.ready ?? null)}; selectedCitations={selectedCitationChunkIds.length}
+        </p>
+        {gate.reasonCode ? (
+          <p className="hint">
+            Blocked: <code>{gate.reasonCode}</code> {gate.reasonMessage ? `- ${gate.reasonMessage}` : ""}
+            {guidanceForAiErrorCode(gate.reasonCode) ? `\n\n${guidanceForAiErrorCode(gate.reasonCode)}` : ""}
+          </p>
+        ) : (
+          <p className="hint">Ready: search and drafting are enabled.</p>
+        )}
+        {healthErrorCode && healthOk === false ? (
+          <p className="hint">
+            Last health error: <code>{healthErrorCode}</code> {healthMessage}
+          </p>
+        ) : null}
+      </div>
 
       <div className="card card--sub">
         <h3>Add Evidence Source</h3>
@@ -432,7 +527,7 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
           </label>
         </div>
         <div className="actions">
-          <button className="btn btn--accent" type="button" onClick={onSearchEvidence} disabled={!selectedSourceId}>
+          <button className="btn btn--accent" type="button" onClick={onSearchEvidence} disabled={!gate.canSearch}>
             Search (selected source)
           </button>
         </div>
@@ -491,7 +586,7 @@ export function AiSection(props: { onToast: (t: { kind: "success" | "error"; tit
             className="btn btn--accent"
             type="button"
             onClick={onDraftExecSummary}
-            disabled={selectedCitationChunkIds.length === 0}
+            disabled={!gate.canDraft}
           >
             Draft Exec Summary (requires citations)
           </button>
