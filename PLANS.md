@@ -85,6 +85,7 @@ These are required by `AGENTS.md`:
 - Deliverable Set 4 is complete: backup/restore + sanitized export + demo dataset tooling + git hygiene.
 - Deliverable Set 5 is complete: import sanitized dataset + deterministic round-trip tests (export -> import -> dashboards/report/validation).
 - Deliverable Set 5.1 is complete: sanitized import error contract hardening (UI branches on error codes, not message substrings) + Phase 5 preflight guardrails (tests/boundaries only).
+- Deliverable Set 6 is in progress: workspace + DB lifecycle (create/open/switch) to operationalize sanitized import into fresh DBs.
 
 ## Stop Conditions
 

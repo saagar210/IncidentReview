@@ -12,6 +12,7 @@ pub mod repo;
 pub mod report;
 pub mod sanitize;
 pub mod validate;
+pub mod workspace;
 
 #[cfg(test)]
 mod tests {

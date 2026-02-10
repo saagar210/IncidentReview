@@ -1267,3 +1267,43 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 
 6) Next steps
 - Continue Phase 4 polish (endpoint coverage/UX) without relaxing determinism, privacy, or module boundaries.
+
+---
+
+## 2026-02-10 - DS6 (in progress): qir_core workspace + DB lifecycle primitives + isolation tests
+
+1) Done: what changed + why
+- Added first-class workspace primitives in `qir_core` to support DS6 workspace-aware DB lifecycle while keeping migrations deterministic and owned by the truth layer:
+  - Create workspace DB (creates file + runs migrations).
+  - Open workspace DB (requires file exists + runs migrations).
+  - `db_is_empty` helper for UX guidance (DS5 sanitized import refusal rule remains enforced in the import core).
+- Added deterministic Rust tests proving:
+  - workspace isolation (seed in workspace A does not affect workspace B)
+  - migrations run on create/open
+  - `db_is_empty` correctness
+  - DS6 scenario foundation: create W1 -> seed -> export sanitized -> create W2 -> import sanitized -> dashboards/validation/report succeed in W2
+- Updated `PLANS.md` to mark DS6 in progress.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/lib.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/src/workspace/mod.rs
+- /Users/d/Projects/IncidentReview/crates/qir_core/tests/workspaces.rs
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- None for determinism/privacy. Next DS6 change-set will add thin Tauri commands + state + persistence for switching workspaces.
+
+5) Status: current phase + complete / in progress / blocked
+- DS6: in progress.
+
+6) Next steps
+- Implement thin Tauri workspace commands + state and persistence of last-opened workspace path.
+- Update UI to create/open/switch workspaces and refresh all views without stale data.
