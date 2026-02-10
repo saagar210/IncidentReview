@@ -1384,3 +1384,37 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 
 6) Next steps
 - Mark DS6 complete in `PLANS.md` after final scenario verification + `rg` checks and repo hygiene.
+
+---
+
+## 2026-02-10 - DS6 completion: workspace + DB lifecycle (create/open/switch) + persistence + refresh
+
+1) Done: what changed + why
+- Completed DS6: first-class workspace management so DS5’s “sanitized import must target an empty DB” is operational:
+  - `qir_core` owns deterministic workspace open/create + migrations + emptiness checks.
+  - `src-tauri` provides thin workspace commands, holds current workspace state, and persists last-opened workspace path locally (no telemetry).
+  - `src` provides a minimal Workspace UI (create/open/switch) and refreshes all views after switching to avoid stale data.
+- Marked DS6 complete in `PLANS.md`.
+
+2) Files changed
+- /Users/d/Projects/IncidentReview/PLANS.md
+- /Users/d/Projects/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /Users/d/Projects/IncidentReview/AGENTS.md; script source: /Users/d/Projects/IncidentReview/package.json) -> OK
+- `cargo test -p qir_core` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /Users/d/Projects/IncidentReview/AGENTS.md) -> OK
+
+4) Scenario verification (scripted; deterministic)
+- Covered by `cargo test -p qir_core` via `crates/qir_core/tests/workspaces.rs` test `scenario_create_seed_export_create_import_and_run_outputs`:
+  - Create workspace W1 -> seed demo dataset -> export sanitized dataset
+  - Create workspace W2 -> import sanitized dataset (fresh DB)
+  - Confirm incidents list + dashboards + validation + report generation succeed in W2
+
+5) Risks / follow-ups
+- None for DS6 scope. Future UX improvements (labels, cleanup, better recents) should remain local-only and preserve code-based error handling.
+
+6) Status: current phase + complete / in progress / blocked
+- DS6: complete.
