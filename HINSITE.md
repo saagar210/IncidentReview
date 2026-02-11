@@ -2228,3 +2228,41 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 
 6) Next steps
 - If we want to make the migration guard more “backup-first” in-app, consider adding a pre-migration “copy DB file” helper (still local-only) without applying migrations.
+
+---
+
+## 2026-02-10 - Build hardening: Vite manual chunking + codex audit trail
+
+1) Done: what changed + why
+- Added deterministic Vite `manualChunks` logic so heavy `echarts` code is split into a dedicated vendor chunk during production builds.
+- Kept application behavior unchanged (no feature logic changed); this is a build-time optimization to reduce oversized main chunk pressure and improve release artifact hygiene.
+- Added and maintained `codex/*` execution artifacts (plan/session/decisions/checkpoints/verification/changelog draft) for interruption-safe auditing and resume.
+
+2) Files changed
+- /workspace/IncidentReview/vite.config.ts
+- /workspace/IncidentReview/codex/PLAN.md
+- /workspace/IncidentReview/codex/SESSION_LOG.md
+- /workspace/IncidentReview/codex/DECISIONS.md
+- /workspace/IncidentReview/codex/CHECKPOINTS.md
+- /workspace/IncidentReview/codex/VERIFICATION.md
+- /workspace/IncidentReview/codex/CHANGELOG_DRAFT.md
+- /workspace/IncidentReview/HINSITE.md
+
+3) Verification: commands run + results
+- `pnpm lint` (required source: /workspace/IncidentReview/AGENTS.md; script source: /workspace/IncidentReview/package.json) -> OK
+- `pnpm test` (required source: /workspace/IncidentReview/AGENTS.md; script source: /workspace/IncidentReview/package.json) -> OK
+- `pnpm tauri build` (required source: /workspace/IncidentReview/AGENTS.md; script source: /workspace/IncidentReview/package.json) -> WARN (frontend build successful; final Tauri bundling blocked by missing `glib-2.0` in this Linux environment)
+- `cargo test -p qir_core` (required source: /workspace/IncidentReview/AGENTS.md) -> OK
+- `cargo test -p qir_ai` (required source: /workspace/IncidentReview/AGENTS.md) -> OK
+
+4) Risks / follow-ups
+- ECharts vendor chunk is still above Vite’s default 500 kB advisory warning. Main bundle size reduced materially, but deeper reduction would require selective dynamic imports or lighter chart packaging in a future scoped change.
+- Tauri Linux bundling remains environment-limited until system package `glib-2.0` is installed and discoverable via `pkg-config`.
+
+5) Status: current phase + complete / in progress / blocked
+- Hardening + delivery documentation: complete.
+- Tauri Linux packaging verification: blocked by environment dependency.
+
+6) Next steps
+- If desired, pursue a second-pass bundle optimization (route-level lazy loading of dashboard-heavy sections).
+- In CI/container, install GLib development packages so `pnpm tauri build` can verify full end-to-end packaging.
