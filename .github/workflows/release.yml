@@ -1,0 +1,37 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+
+jobs:
+  build-release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: pnpm install
+      - run: pnpm tauri build --ci
+        timeout-minutes: 60
+      - run: |
+          mkdir -p release
+          cp src-tauri/target/release/bundle/dmg/IncidentReview*.dmg release/ 2>/dev/null || true
+          cp src-tauri/target/release/bundle/macos/IncidentReview.app.tar.gz release/ 2>/dev/null || true
+          ls -la release/
+      - uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          files: release/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
