@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import "./lib/i18n"; // Initialize i18n
 
 import { extractAppError, invokeValidated } from "./lib/tauri";
 import { guidanceForSanitizedImportErrorCode } from "./lib/sanitized_import_guidance";
