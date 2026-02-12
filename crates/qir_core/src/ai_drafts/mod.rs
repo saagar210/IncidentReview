@@ -157,9 +157,10 @@ pub fn create_ai_draft(conn: &Connection, input: CreateAiDraftInput) -> Result<A
     // Compute revision number
     let revision_number = if let Some(parent_id) = input.parent_draft_id {
         // Get parent's revision number and increment
-        get_ai_draft(conn, parent_id)?
-            .map(|parent| parent.revision_number + 1)
-            .unwrap_or(2) // Fallback to 2 if parent not found
+        let parent = get_ai_draft(conn, parent_id)?.ok_or_else(|| {
+            AppError::new("DB_NOT_FOUND", "Parent draft not found when creating revision")
+        })?;
+        parent.revision_number + 1
     } else {
         1 // Root draft
     };
