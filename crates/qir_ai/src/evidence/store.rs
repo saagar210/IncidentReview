@@ -3,6 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use qir_core::error::AppError;
+use qir_core::repo::{PaginationParams, PaginationResult};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -609,6 +610,37 @@ impl EvidenceStore {
         });
 
         Ok(out)
+    }
+
+    /// List chunks with pagination support
+    pub fn list_chunks_paginated(
+        &self,
+        query: EvidenceQueryStore,
+        pagination: PaginationParams,
+    ) -> Result<PaginationResult<EvidenceChunkSummary>, AppError> {
+        pagination.validate()?;
+
+        // Get all chunks first (since we're file-based, not database-backed)
+        let all_chunks = self.list_chunks(query)?;
+        let total = all_chunks.len() as u32;
+
+        // Apply pagination
+        let offset = pagination.offset as usize;
+        let limit = pagination.limit as usize;
+        let end = std::cmp::min(offset + limit, all_chunks.len());
+
+        let items = if offset < all_chunks.len() {
+            all_chunks[offset..end].to_vec()
+        } else {
+            Vec::new()
+        };
+
+        Ok(PaginationResult::new(
+            items,
+            total,
+            pagination.limit,
+            pagination.offset,
+        ))
     }
 
     pub fn citation_for_chunk(&self, chunk: &EvidenceChunk) -> Citation {
