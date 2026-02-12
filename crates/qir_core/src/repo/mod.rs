@@ -6,6 +6,66 @@ use crate::error::AppError;
 use crate::metrics::{compute_incident_metrics, IncidentMetrics};
 use crate::validate::validate_incident;
 
+/// Pagination parameters for list queries
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaginationParams {
+    pub limit: u32,  // max 100
+    pub offset: u32,
+    pub sort_by: Option<String>,    // e.g., "created_at", "title"
+    pub sort_order: Option<String>, // "asc" or "desc"
+}
+
+impl PaginationParams {
+    /// Create default pagination (first 50 items)
+    pub fn default_first_page() -> Self {
+        PaginationParams {
+            limit: 50,
+            offset: 0,
+            sort_by: None,
+            sort_order: None,
+        }
+    }
+
+    /// Validate pagination params (limit <= 100)
+    pub fn validate(&self) -> Result<(), AppError> {
+        if self.limit == 0 || self.limit > 100 {
+            return Err(AppError::new(
+                "INVALID_PAGINATION",
+                "Limit must be between 1 and 100",
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Pagination response wrapper
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaginationResult<T> {
+    pub items: Vec<T>,
+    pub total: u32,
+    pub limit: u32,
+    pub offset: u32,
+    pub has_next: bool,
+    pub has_prev: bool,
+}
+
+impl<T> PaginationResult<T> {
+    /// Create a paginated result
+    pub fn new(items: Vec<T>, total: u32, limit: u32, offset: u32) -> Self {
+        let has_next = (offset + limit as u32) < total;
+        let has_prev = offset > 0;
+
+        PaginationResult {
+            items,
+            total,
+            limit,
+            offset,
+            has_next,
+            has_prev,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Artifact {
     pub id: i64,
@@ -40,26 +100,82 @@ pub struct IncidentDetail {
     pub timeline_events: Vec<TimelineEvent>,
 }
 
+/// List all incidents (backwards compatible)
 pub fn list_incidents(conn: &Connection) -> Result<Vec<Incident>, AppError> {
-    let mut stmt = conn
-    .prepare(
-      r#"
-      SELECT
-        id, external_id, fingerprint, title, description, severity,
-        detection_source, vendor, service,
-        impact_pct, service_health_pct,
-        start_ts, first_observed_ts, it_awareness_ts, ack_ts, mitigate_ts, resolve_ts,
-        start_ts_raw, first_observed_ts_raw, it_awareness_ts_raw, ack_ts_raw, mitigate_ts_raw, resolve_ts_raw
-      FROM incidents
-      ORDER BY id ASC
-      "#,
-    )
-    .map_err(|e| {
-      AppError::new("DB_QUERY_FAILED", "Failed to prepare incidents query").with_details(e.to_string())
+    let pagination = PaginationParams::default_first_page();
+    let mut page = 1;
+    let mut all_incidents = Vec::new();
+
+    loop {
+        let params = PaginationParams {
+            limit: pagination.limit,
+            offset: (page - 1) * pagination.limit,
+            sort_by: pagination.sort_by.clone(),
+            sort_order: pagination.sort_order.clone(),
+        };
+
+        let result = list_incidents_paginated(conn, params)?;
+        all_incidents.extend(result.items);
+
+        if !result.has_next {
+            break;
+        }
+        page += 1;
+    }
+
+    Ok(all_incidents)
+}
+
+/// List incidents with pagination
+pub fn list_incidents_paginated(
+    conn: &Connection,
+    pagination: PaginationParams,
+) -> Result<PaginationResult<Incident>, AppError> {
+    pagination.validate()?;
+
+    // Get total count
+    let total = count_incidents(conn)? as u32;
+
+    let order_clause = match pagination.sort_by.as_deref() {
+        Some("created_at") | Some("start_ts") => {
+            if pagination.sort_order.as_deref() == Some("desc") {
+                "ORDER BY start_ts DESC, id DESC"
+            } else {
+                "ORDER BY start_ts ASC, id ASC"
+            }
+        }
+        Some("title") => {
+            if pagination.sort_order.as_deref() == Some("desc") {
+                "ORDER BY title DESC, id DESC"
+            } else {
+                "ORDER BY title ASC, id ASC"
+            }
+        }
+        _ => "ORDER BY id ASC",
+    };
+
+    let query = format!(
+        r#"
+        SELECT
+          id, external_id, fingerprint, title, description, severity,
+          detection_source, vendor, service,
+          impact_pct, service_health_pct,
+          start_ts, first_observed_ts, it_awareness_ts, ack_ts, mitigate_ts, resolve_ts,
+          start_ts_raw, first_observed_ts_raw, it_awareness_ts_raw, ack_ts_raw, mitigate_ts_raw, resolve_ts_raw
+        FROM incidents
+        {}
+        LIMIT ?1 OFFSET ?2
+        "#,
+        order_clause
+    );
+
+    let mut stmt = conn.prepare(&query).map_err(|e| {
+        AppError::new("DB_QUERY_FAILED", "Failed to prepare incidents query")
+            .with_details(e.to_string())
     })?;
 
     let rows = stmt
-        .query_map([], |row| {
+        .query_map([pagination.limit as i32, pagination.offset as i32], |row| {
             Ok(Incident {
                 id: row.get(0)?,
                 external_id: row.get(1)?,
@@ -91,15 +207,20 @@ pub fn list_incidents(conn: &Connection) -> Result<Vec<Incident>, AppError> {
                 .with_details(e.to_string())
         })?;
 
-    let mut out = Vec::new();
+    let mut items = Vec::new();
     for r in rows {
-        out.push(r.map_err(|e| {
+        items.push(r.map_err(|e| {
             AppError::new("DB_QUERY_FAILED", "Failed to decode incident row")
                 .with_details(e.to_string())
         })?);
     }
 
-    Ok(out)
+    Ok(PaginationResult::new(
+        items,
+        total,
+        pagination.limit,
+        pagination.offset,
+    ))
 }
 
 pub fn count_incidents(conn: &Connection) -> Result<i64, AppError> {
