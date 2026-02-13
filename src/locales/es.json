@@ -1,0 +1,87 @@
+{
+  "nav": {
+    "workspace": "Área de Trabajo",
+    "jira": "Importar de Jira",
+    "slack": "Importar de Slack",
+    "dashboards": "Paneles",
+    "ai": "Herramientas de IA",
+    "settings": "Configuración"
+  },
+  "dashboard": {
+    "title": "Paneles de Incidentes",
+    "incidentCount": "Incidentes Totales",
+    "severity": "Severidad",
+    "detection": "Detección",
+    "vendor": "Proveedor",
+    "service": "Servicio",
+    "mttr": "MTTR (Tiempo Medio para Resolver)",
+    "detectionLag": "Demora de Detección",
+    "clearFilter": "Limpiar filtro"
+  },
+  "incidents": {
+    "title": "Incidentes",
+    "id": "ID",
+    "title": "Título",
+    "severity": "Severidad",
+    "source": "Fuente",
+    "vendor": "Proveedor",
+    "service": "Servicio",
+    "created": "Creado",
+    "status": "Estado",
+    "noIncidents": "No se encontraron incidentes",
+    "details": "Detalles",
+    "artifacts": "Artefactos",
+    "timeline": "Línea de Tiempo"
+  },
+  "ai": {
+    "title": "Herramientas de IA",
+    "drafts": "Borradores",
+    "evidence": "Evidencia",
+    "generateDraft": "Generar Borrador",
+    "selectSection": "Seleccionar Sección para Redactar",
+    "execSummary": "Resumen Ejecutivo",
+    "incidentHighlights": "Aspectos Destacados de Incidentes",
+    "themeAnalysis": "Análisis de Temas",
+    "actionPlan": "Plan de Acción",
+    "narrativeRecap": "Recapitulación Narrativa",
+    "generating": "Generando...",
+    "error": "Error al generar borrador",
+    "noDrafts": "Sin borradores aún",
+    "draftSection": "Redactar un resumen ejecutivo basado en la evidencia."
+  },
+  "evidence": {
+    "title": "Evidencia",
+    "sources": "Fuentes",
+    "chunks": "Fragmentos",
+    "addSource": "Agregar Fuente",
+    "paste": "Pegar Texto",
+    "jira": "Problemas de Jira",
+    "slack": "Transcripción de Slack",
+    "buildingIndex": "Construyendo índice...",
+    "indexReady": "Índice listo",
+    "search": "Buscar",
+    "noResults": "Sin resultados"
+  },
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "confirm": "Confirmar",
+    "error": "Error",
+    "success": "Éxito",
+    "loading": "Cargando...",
+    "noData": "Sin datos",
+    "close": "Cerrar",
+    "open": "Abrir",
+    "edit": "Editar",
+    "create": "Crear",
+    "update": "Actualizar"
+  },
+  "pagination": {
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "page": "Página {{current}} de {{total}}",
+    "showing": "Mostrando {{start}} a {{end}} de {{total}} elementos",
+    "itemsPerPage": "Elementos por página"
+  }
+}

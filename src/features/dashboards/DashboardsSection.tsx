@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import ReactECharts from "echarts-for-react";
+import { LazyEChart } from "./LazyEChart";
 
 import { formatSeconds } from "../../lib/format";
 
@@ -269,7 +269,7 @@ export function DashboardsSection(props: {
 
               {severityChartOption && (
                 <div className="chart">
-                  <ReactECharts
+                  <LazyEChart
                     option={severityChartOption}
                     style={{ height: 260 }}
                     onEvents={{
@@ -377,7 +377,7 @@ export function DashboardsSection(props: {
               <div className="chart">
                 <h3 className="subhead">Detection Source Mix</h3>
                 {detectionSourceChartOption && (
-                  <ReactECharts
+                  <LazyEChart
                     option={detectionSourceChartOption}
                     style={{ height: 260 }}
                     onEvents={{
@@ -393,7 +393,7 @@ export function DashboardsSection(props: {
               <div className="chart">
                 <h3 className="subhead">IT Awareness Lag Distribution</h3>
                 {itAwarenessLagOption && (
-                  <ReactECharts
+                  <LazyEChart
                     option={itAwarenessLagOption}
                     style={{ height: 260 }}
                     onEvents={{
@@ -419,7 +419,7 @@ export function DashboardsSection(props: {
               <div className="chart">
                 <h3 className="subhead">Time To Mitigate</h3>
                 {timeToMitigationOption && (
-                  <ReactECharts
+                  <LazyEChart
                     option={timeToMitigationOption}
                     style={{ height: 260 }}
                     onEvents={{
@@ -435,7 +435,7 @@ export function DashboardsSection(props: {
               <div className="chart">
                 <h3 className="subhead">Time To Resolve</h3>
                 {timeToResolveOption && (
-                  <ReactECharts
+                  <LazyEChart
                     option={timeToResolveOption}
                     style={{ height: 260 }}
                     onEvents={{
@@ -463,7 +463,7 @@ export function DashboardsSection(props: {
               <div className="chart">
                 <h3 className="subhead">Top Vendors By Incident Count</h3>
                 {vendorCountOption && (
-                  <ReactECharts
+                  <LazyEChart
                     option={vendorCountOption}
                     style={{ height: 260 }}
                     onEvents={{
@@ -479,7 +479,7 @@ export function DashboardsSection(props: {
               <div className="chart">
                 <h3 className="subhead">Top Vendors By Weighted Pain</h3>
                 {vendorPainOption && (
-                  <ReactECharts
+                  <LazyEChart
                     option={vendorPainOption}
                     style={{ height: 260 }}
                     onEvents={{
@@ -508,7 +508,7 @@ export function DashboardsSection(props: {
               <div className="chart">
                 <h3 className="subhead">Top Services By Incident Count</h3>
                 {serviceCountOption && (
-                  <ReactECharts
+                  <LazyEChart
                     option={serviceCountOption}
                     style={{ height: 260 }}
                     onEvents={{
@@ -524,7 +524,7 @@ export function DashboardsSection(props: {
               <div className="chart">
                 <h3 className="subhead">Top Services By Weighted Pain</h3>
                 {servicePainOption && (
-                  <ReactECharts
+                  <LazyEChart
                     option={servicePainOption}
                     style={{ height: 260 }}
                     onEvents={{

@@ -19,6 +19,7 @@ use qir_core::analytics::{DashboardPayloadV1, DashboardPayloadV2};
 use qir_core::backup::{BackupCreateResult, BackupManifest, RestoreResult};
 use qir_core::demo::seed_demo_dataset as core_seed_demo_dataset;
 use qir_core::error::AppError;
+use qir_core::repo::{PaginationParams, PaginationResult};
 use qir_core::ingest::jira_csv::{
     import_jira_csv, preview_jira_csv, JiraCsvMapping, JiraCsvPreview, JiraImportSummary,
 };
@@ -670,6 +671,30 @@ fn ai_evidence_list_chunks(
         include_text: false,
         source_id,
     })
+}
+
+#[tauri::command]
+fn ai_evidence_list_chunks_paginated(
+    app: tauri::AppHandle,
+    source_id: Option<String>,
+    limit: u32,
+    offset: u32,
+) -> Result<PaginationResult<AiEvidenceChunkSummary>, AppError> {
+    let root = ai_store_root(&app)?;
+    let store = AiEvidenceStore::open(root);
+    let pagination = PaginationParams {
+        limit,
+        offset,
+        sort_by: None,
+        sort_order: None,
+    };
+    store.list_chunks_paginated(
+        AiEvidenceQueryStore {
+            include_text: false,
+            source_id,
+        },
+        pagination,
+    )
 }
 
 #[tauri::command]

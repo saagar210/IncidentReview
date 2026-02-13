@@ -1,0 +1,87 @@
+{
+  "nav": {
+    "workspace": "Workspace",
+    "jira": "Jira Import",
+    "slack": "Slack Import",
+    "dashboards": "Dashboards",
+    "ai": "AI Tools",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "title": "Incident Dashboards",
+    "incidentCount": "Total Incidents",
+    "severity": "Severity",
+    "detection": "Detection",
+    "vendor": "Vendor",
+    "service": "Service",
+    "mttr": "MTTR (Mean Time to Resolve)",
+    "detectionLag": "Detection Lag",
+    "clearFilter": "Clear filter"
+  },
+  "incidents": {
+    "title": "Incidents",
+    "id": "ID",
+    "title": "Title",
+    "severity": "Severity",
+    "source": "Source",
+    "vendor": "Vendor",
+    "service": "Service",
+    "created": "Created",
+    "status": "Status",
+    "noIncidents": "No incidents found",
+    "details": "Details",
+    "artifacts": "Artifacts",
+    "timeline": "Timeline"
+  },
+  "ai": {
+    "title": "AI Tools",
+    "drafts": "Drafts",
+    "evidence": "Evidence",
+    "generateDraft": "Generate Draft",
+    "selectSection": "Select Section to Draft",
+    "execSummary": "Executive Summary",
+    "incidentHighlights": "Incident Highlights",
+    "themeAnalysis": "Theme Analysis",
+    "actionPlan": "Action Plan",
+    "narrativeRecap": "Narrative Recap",
+    "generating": "Generating...",
+    "error": "Error generating draft",
+    "noDrafts": "No drafts yet",
+    "draftSection": "Draft an executive summary based on the evidence."
+  },
+  "evidence": {
+    "title": "Evidence",
+    "sources": "Sources",
+    "chunks": "Chunks",
+    "addSource": "Add Source",
+    "paste": "Paste Text",
+    "jira": "Jira Issues",
+    "slack": "Slack Transcript",
+    "buildingIndex": "Building index...",
+    "indexReady": "Index ready",
+    "search": "Search",
+    "noResults": "No results found"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "error": "Error",
+    "success": "Success",
+    "loading": "Loading...",
+    "noData": "No data",
+    "close": "Close",
+    "open": "Open",
+    "edit": "Edit",
+    "create": "Create",
+    "update": "Update"
+  },
+  "pagination": {
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page {{current}} of {{total}}",
+    "showing": "Showing {{start}} to {{end}} of {{total}} items",
+    "itemsPerPage": "Items per page"
+  }
+}
