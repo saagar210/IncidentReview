@@ -38,8 +38,31 @@ const MIGRATION_0004: (&str, &str) = (
     )),
 );
 
+const MIGRATION_0005: (&str, &str) = (
+    "0005_add_draft_revisions.sql",
+    include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../migrations/0005_add_draft_revisions.sql"
+    )),
+);
+
+const MIGRATION_0006: (&str, &str) = (
+    "0006_add_pagination_indexes.sql",
+    include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../migrations/0006_add_pagination_indexes.sql"
+    )),
+);
+
 fn migrations() -> Vec<(&'static str, &'static str)> {
-    vec![MIGRATION_0001, MIGRATION_0002, MIGRATION_0003, MIGRATION_0004]
+    vec![
+        MIGRATION_0001,
+        MIGRATION_0002,
+        MIGRATION_0003,
+        MIGRATION_0004,
+        MIGRATION_0005,
+        MIGRATION_0006,
+    ]
 }
 
 pub fn latest_migration_name() -> &'static str {

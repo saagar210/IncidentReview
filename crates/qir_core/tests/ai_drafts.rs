@@ -16,6 +16,9 @@ fn ai_draft_persists_and_hash_matches_expected_sha256() {
         model_params_hash: "params_hash".to_string(),
         prompt_template_version: "exec_summary_v1".to_string(),
         created_at: "2026-02-10T00:00:00Z".to_string(),
+        parent_draft_id: None,
+        revision_notes: None,
+        branch_label: None,
     };
 
     let a = create_ai_draft(&conn, input.clone()).expect("create");
@@ -69,6 +72,9 @@ fn storing_without_citations_fails_and_does_not_insert() {
             model_params_hash: "params_hash".to_string(),
             prompt_template_version: "exec_summary_v1".to_string(),
             created_at: "2026-02-10T00:00:00Z".to_string(),
+            parent_draft_id: None,
+            revision_notes: None,
+            branch_label: None,
         },
     )
     .expect_err("should fail");

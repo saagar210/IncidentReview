@@ -166,6 +166,11 @@ cargo test -p qir_ai
 pnpm tauri build
 ```
 
+### Clean local build/cache artifacts
+```bash
+pnpm clean:local
+```
+
 ---
 
 ## Local AI via Ollama (optional)

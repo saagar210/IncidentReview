@@ -801,6 +801,9 @@ fn ai_drafts_create(app: tauri::AppHandle, req: AiDraftCreateRequest) -> Result<
             model_params_hash: req.model_params_hash,
             prompt_template_version: req.prompt_template_version,
             created_at,
+            parent_draft_id: None,
+            revision_notes: None,
+            branch_label: None,
         },
     )
 }

@@ -244,9 +244,20 @@ mod tests {
             incident_count: 0,
             severity_counts: vec![],
             incidents: vec![],
-            detection_story: Default::default(),
-            vendor_service_story: Default::default(),
-            response_story: Default::default(),
+            detection_story: crate::analytics::DetectionStoryV1 {
+                detection_source_mix: vec![],
+                it_awareness_lag_buckets: vec![],
+            },
+            vendor_service_story: crate::analytics::VendorServiceStoryV1 {
+                top_vendors_by_count: vec![],
+                top_services_by_count: vec![],
+                top_vendors_by_pain: vec![],
+                top_services_by_pain: vec![],
+            },
+            response_story: crate::analytics::ResponseStoryV1 {
+                time_to_mitigation_buckets: vec![],
+                time_to_resolve_buckets: vec![],
+            },
         };
 
         cache.set_v1(v1, hash.clone());

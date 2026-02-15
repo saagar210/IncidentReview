@@ -1,12 +1,20 @@
 node_modules/
 dist/
 .DS_Store
+coverage/
+.nyc_output/
+.parcel-cache/
+.cache/
+.eslintcache
+*.tsbuildinfo
+*.log
 
 # Rust
 target/
 
 # Tauri
 src-tauri/target/
+src-tauri/gen/
 
 # Local tooling / caches
 .pnpm-store/
@@ -15,4 +23,3 @@ src-tauri/target/
 
 # Temporary scaffolding (not part of repo)
 _scaffold/
-
