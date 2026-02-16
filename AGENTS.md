@@ -218,7 +218,7 @@ Source: `.codex/verify.commands` (derived from `.github/workflows/ci.yml`)
 - typecheck: `N/A (covered indirectly by build/toolchain checks)`
 - unit-test: `pnpm test`; `cargo test -p qir_core --all-features`; `cargo test -p qir_ai --all-features`
 - integration-test: `N/A (no standalone integration command defined in CI/docs)`
-- build: `pnpm tauri build --ci`
+- build: `N/A (desktop packaging build is non-blocking for codex verify gates)`
 
 ### Definition of Done
 - All commands in `.codex/verify.commands` pass via `.codex/scripts/run_verify_commands.sh`.

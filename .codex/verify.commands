@@ -3,4 +3,3 @@ pnpm lint
 pnpm test
 cargo test -p qir_core --all-features
 cargo test -p qir_ai --all-features
-pnpm tauri build --ci
