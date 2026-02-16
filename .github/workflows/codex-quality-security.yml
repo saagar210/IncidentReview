@@ -73,7 +73,7 @@ jobs:
           ignore-unfixed: true
 
   scorecard:
-    if: github.event_name == "schedule"
+    if: github.event_name == 'schedule'
     permissions:
       security-events: write
       id-token: write
