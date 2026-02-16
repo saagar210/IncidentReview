@@ -208,3 +208,36 @@ Do not add additional commands without adding them to `package.json` scripts and
 - [ ] Themes + actions + effectiveness dashboard
 - [ ] Demo dataset + sanitized export + backup/restore
 - [ ] HINSITE.md maintained with verification logs
+
+## Codex Reliability Contract
+
+### Canonical Verification Commands (Source of Truth)
+Source: `.codex/verify.commands` (derived from `.github/workflows/ci.yml`)
+- lint: `pnpm lint`
+- format-check: `N/A (no standalone formatter check defined in CI/docs)`
+- typecheck: `N/A (covered indirectly by build/toolchain checks)`
+- unit-test: `pnpm test`; `cargo test -p qir_core --all-features`; `cargo test -p qir_ai --all-features`
+- integration-test: `N/A (no standalone integration command defined in CI/docs)`
+- build: `N/A (desktop packaging build is non-blocking for codex verify gates)`
+
+### Definition of Done
+- All commands in `.codex/verify.commands` pass via `.codex/scripts/run_verify_commands.sh`.
+- No open `critical` or `high` `ReviewFindingV1` findings.
+- Diff scope matches approved task scope.
+- Security checks (secrets, dependency, and SAST) are clean or explicitly waived with owner + expiry.
+
+### Agent Contract
+- Reviewer agent: read-only and emits only `ReviewFindingV1` findings.
+- Fixer agent: applies accepted findings in severity order and reports exact file patches + verification.
+- Final verifier: re-runs `.codex/scripts/run_verify_commands.sh` and summarizes `GateReportV1`.
+
+## UI Hard Gates (Required for frontend/UI changes)
+
+1) Read-only reviewer outputs `UIFindingV1[]` (`/Users/d/.codex/contracts/UIFindingV1.schema.json`).
+2) Fixer applies accepted findings in severity order: `P0 -> P1 -> P2 -> P3`.
+3) Required state coverage per changed UI surface: loading, empty, error, success, disabled, focus-visible.
+4) Required pre-done gates:
+   - `pnpm ui:gate:static`
+   - `pnpm ui:gate:regression`
+   - Lighthouse CI workflow (`.github/workflows/lighthouse.yml`)
+5) Done-state is blocked if any required UI gate is `fail` or `not-run`.
