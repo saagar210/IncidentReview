@@ -5,11 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:lean": "bash scripts/dev-lean.sh",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
     "test": "vitest run",
+    "clean:build": "node scripts/clean-build.mjs",
     "clean:local": "node scripts/clean-local.mjs",
+    "clean:git": "node scripts/clean-git.mjs",
+    "clean:repo": "pnpm clean:local && pnpm clean:git",
     "tauri": "tauri"
   },
   "dependencies": {

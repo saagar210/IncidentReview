@@ -153,6 +153,11 @@ pnpm install
 pnpm tauri dev
 ```
 
+### Run in lean dev mode (auto-clean heavy build cache on exit)
+```bash
+pnpm dev:lean
+```
+
 ### Run tests
 ```bash
 pnpm test
@@ -169,6 +174,16 @@ pnpm tauri build
 ### Clean local build/cache artifacts
 ```bash
 pnpm clean:local
+```
+
+### Clean only heavy Rust/Tauri build artifacts
+```bash
+pnpm clean:build
+```
+
+### Aggressive repository cleanup (local caches + Git object store)
+```bash
+pnpm clean:repo
 ```
 
 ---

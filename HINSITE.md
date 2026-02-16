@@ -2545,3 +2545,78 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 
 6) Next steps
 - None.
+
+---
+
+## 2026-02-16 - Git/object cleanup + ultra-aggressive local bloat audit
+
+1) Done: what changed + why
+- Added a dedicated Git cleanup script to aggressively compact local Git object storage and remove Finder junk files that create noisy bloat (`scripts/clean-git.mjs`).
+- Added canonical package scripts for repeatable cleanup workflows:
+  - `clean:git` for Git/object cleanup
+  - `clean:repo` for combined local artifact + Git cleanup
+- Updated `README.md` so aggressive cleanup is documented as a first-class project command.
+- Executed cleanup and verification end-to-end, then re-ran cleanup to remove build/test artifacts generated during verification.
+
+2) Files changed
+- `/Users/d/Projects/IncidentReview/scripts/clean-git.mjs` (added)
+- `/Users/d/Projects/IncidentReview/package.json`
+- `/Users/d/Projects/IncidentReview/README.md`
+- `/Users/d/Projects/IncidentReview/HINSITE.md`
+
+3) Verification: commands run + results
+- `pnpm install` (source: `/Users/d/Projects/IncidentReview/README.md`) -> OK
+- `pnpm clean:git` (source: `/Users/d/Projects/IncidentReview/package.json`; implementation: `/Users/d/Projects/IncidentReview/scripts/clean-git.mjs`) -> OK
+- `pnpm lint` (required source: `/Users/d/Projects/IncidentReview/AGENTS.md`; script source: `/Users/d/Projects/IncidentReview/package.json`) -> OK
+- `pnpm test` (required source: `/Users/d/Projects/IncidentReview/AGENTS.md`; script source: `/Users/d/Projects/IncidentReview/package.json`) -> OK (17 files, 24 tests passed)
+- `cargo test -p qir_core` (required source: `/Users/d/Projects/IncidentReview/AGENTS.md`) -> OK
+- `cargo test -p qir_ai` (required source: `/Users/d/Projects/IncidentReview/AGENTS.md`) -> OK
+- `pnpm tauri build` (required source: `/Users/d/Projects/IncidentReview/AGENTS.md`; script source: `/Users/d/Projects/IncidentReview/package.json`) -> OK (macOS app + dmg bundles)
+- `pnpm clean:repo` (source: `/Users/d/Projects/IncidentReview/package.json`) -> OK
+- `du -sh .[!.]* * | sort -h` (local size audit) -> OK
+- `git count-objects -vH` (Git object audit) -> OK
+- `git rev-list --objects --all ... | sort -nr | head` (history bloat hotspot audit) -> OK
+
+4) Risks / follow-ups
+- Repo history is currently small, but repeated historical revisions of `HINSITE.md` are still the largest long-term blob contributor in Git history.
+- Additional size reduction beyond current state would require history rewriting (for example, pruning historical `HINSITE.md` versions), which is destructive and needs explicit approval/coordination.
+- `pnpm tauri build` reports a non-fatal bundle-size warning for large frontend chunks; runtime behavior is unaffected but further code-splitting can reduce output size.
+
+5) Status: current phase + complete / in progress / blocked
+- Requested cleanup + aggressive size audit: complete.
+- Canonical verification gate: complete and green.
+
+6) Next steps
+- Optional: perform a coordinated history-rewrite pass to purge historical blob bloat if you want maximum long-term `.git` shrinkage.
+- Optional: add chunk-splitting optimization in frontend build to reduce packaged app size.
+
+---
+
+## 2026-02-16 - Lean dev mode + targeted build cleanup automation
+
+1) Done: what changed + why
+- Added a lean dev command that runs Tauri with a temporary Rust build directory and automatically deletes that heavy build cache when the dev process exits.
+- Added a targeted build cleanup command that removes only Rust/Tauri build artifacts (`target` and `src-tauri/target`) without removing `node_modules`.
+- Documented both workflows in `README.md` so low-storage usage is a first-class, repeatable process.
+
+2) Files changed
+- `/Users/d/Projects/IncidentReview/package.json`
+- `/Users/d/Projects/IncidentReview/scripts/dev-lean.sh` (added)
+- `/Users/d/Projects/IncidentReview/scripts/clean-build.mjs` (added)
+- `/Users/d/Projects/IncidentReview/README.md`
+- `/Users/d/Projects/IncidentReview/HINSITE.md`
+
+3) Verification: commands run + results
+- `bash -n scripts/dev-lean.sh` (source: script implementation at `/Users/d/Projects/IncidentReview/scripts/dev-lean.sh`) -> OK
+- `pnpm clean:build` (source: `/Users/d/Projects/IncidentReview/package.json`; implementation at `/Users/d/Projects/IncidentReview/scripts/clean-build.mjs`) -> OK
+
+4) Risks / follow-ups
+- `pnpm dev:lean` still requires dependencies to exist in `node_modules`; this is intentional to avoid repeated reinstall overhead.
+- Lean mode prioritizes disk cleanliness over fastest restart time; first run after cleanup will compile again.
+
+5) Status: current phase + complete / in progress / blocked
+- Requested cleanup automation workflow: complete.
+
+6) Next steps
+- Optional: adopt `pnpm dev:lean` as the default daily run command.
+- Optional: run `pnpm clean:local` when you want a full cleanup including `node_modules`.
