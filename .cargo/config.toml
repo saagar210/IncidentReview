@@ -1,2 +1,2 @@
 [build]
-target-dir = "/Users/d/Library/Caches/Codex/build/rust/IncidentReview/"
+target-dir = "target"
