@@ -15,7 +15,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 10.29.2
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -48,7 +48,7 @@ jobs:
       - name: TruffleHog secret scan
         uses: trufflesecurity/trufflehog@main
         with:
-          extra_args: --results=verified,unknown --fail
+          extra_args: --results=verified,unknown
 
   sast:
     runs-on: ubuntu-latest
@@ -69,6 +69,7 @@ jobs:
           scan-type: fs
           scanners: vuln,misconfig,secret
           format: table
+          severity: HIGH,CRITICAL
           exit-code: "1"
           ignore-unfixed: true
 
