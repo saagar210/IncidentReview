@@ -1,0 +1,8 @@
+# Source: .github/workflows/ci.yml
+pnpm lint
+pnpm ui:gate:static
+pnpm test
+pnpm ui:gate:regression
+cargo test -p qir_core --all-features
+cargo test -p qir_ai --all-features
+pnpm tauri build --ci
