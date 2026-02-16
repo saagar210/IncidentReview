@@ -9,6 +9,7 @@ on:
 
 jobs:
   verify:
+    name: codex_verify
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,6 +41,7 @@ jobs:
         run: bash ./.codex/scripts/run_verify_commands.sh
 
   secrets:
+    name: codex_secrets
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,6 +53,7 @@ jobs:
           extra_args: --results=verified,unknown
 
   sast:
+    name: codex_sast
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -60,6 +63,7 @@ jobs:
           config: p/default
 
   dependency_and_misconfig:
+    name: codex_dependency_and_misconfig
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -74,6 +78,7 @@ jobs:
           ignore-unfixed: true
 
   scorecard:
+    name: codex_scorecard
     if: github.event_name == 'schedule'
     permissions:
       security-events: write
