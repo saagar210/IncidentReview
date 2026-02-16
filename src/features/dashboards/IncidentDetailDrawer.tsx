@@ -66,13 +66,19 @@ export function IncidentDetailDrawer(props: {
   if (!props.open) return null;
 
   return (
-    <div className="drawerOverlay" role="dialog" aria-modal="true" onClick={props.onClose}>
-      <aside
-        className="drawer"
-        onClick={(e) => {
-          e.stopPropagation();
-        }}
-      >
+    <div
+      className="drawerOverlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) props.onClose();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape" || e.key === "Enter" || e.key === " ") props.onClose();
+      }}
+      role="button"
+      tabIndex={0}
+      aria-label="Close incident detail drawer"
+    >
+      <aside className="drawer" role="dialog" aria-modal="true">
         <div className="drawerHeader">
           <div>
             <div className="muted">Incident detail</div>

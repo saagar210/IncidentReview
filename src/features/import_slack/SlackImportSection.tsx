@@ -92,6 +92,7 @@ export function SlackImportSection(props: {
               <p className="hint">Choose an incident to attach events to.</p>
               <select
                 className="select"
+                aria-label="Existing incident"
                 value={props.slackExistingIncidentId ?? ""}
                 onChange={(e) => props.setSlackExistingIncidentId(e.currentTarget.value ? Number(e.currentTarget.value) : null)}
               >
@@ -197,4 +198,3 @@ export function SlackImportSection(props: {
     </section>
   );
 }
-

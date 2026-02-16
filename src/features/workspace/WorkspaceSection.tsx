@@ -51,6 +51,7 @@ export function WorkspaceSection(props: {
       <div className="actions">
         <select
           className="select"
+          aria-label="Recent workspaces"
           value={props.workspaceRecentPick}
           onChange={(e) => props.onWorkspaceRecentPickChange(e.currentTarget.value)}
         >
@@ -73,4 +74,3 @@ export function WorkspaceSection(props: {
     </section>
   );
 }
-

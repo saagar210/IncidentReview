@@ -14,4 +14,5 @@ echo
 echo "Next commands (from /Users/d/Projects/IncidentReview/README.md):"
 echo "  pnpm install"
 echo "  pnpm tauri dev"
-
+echo "Lean dev mode (README.md + package.json):"
+echo "  pnpm run dev:lean"

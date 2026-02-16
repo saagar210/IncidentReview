@@ -101,6 +101,7 @@ export function JiraImportSection(props: {
           <div className="actions">
             <select
               className="select"
+              aria-label="Jira mapping profile"
               value={props.selectedProfileId ?? ""}
               onChange={(e) => {
                 const v = e.currentTarget.value;
@@ -217,6 +218,7 @@ export function JiraImportSection(props: {
                 <div className="mappingRow__label">{f.label}</div>
                 <select
                   className="select"
+                  aria-label={`CSV column for ${f.label}`}
                   value={(props.mapping as never)[f.key] ?? (f.required ? "" : "")}
                   onChange={(e) => {
                     const v = e.currentTarget.value;

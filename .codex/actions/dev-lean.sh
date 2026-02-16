@@ -7,7 +7,5 @@ if [ -f "$SCRIPT_DIR/_artifact_env.sh" ]; then
   # shellcheck source=/dev/null
   source "$SCRIPT_DIR/_artifact_env.sh"
 fi
-pnpm test
-cargo test -p qir_core
-cargo test -p qir_ai
 
+pnpm run dev:lean

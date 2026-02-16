@@ -7,14 +7,23 @@
     "dev": "vite",
     "dev:lean": "bash scripts/dev-lean.sh",
     "build": "tsc && vite build",
+    "build:ui": "tsc --noEmit --project tsconfig.ui.json && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
+    "ui:lint": "pnpm lint && stylelint \"src/**/*.{css,scss}\" --allow-empty-input",
+    "ui:typecheck": "tsc --noEmit --project tsconfig.ui.json",
+    "ui:gate:static": "pnpm ui:lint && pnpm ui:typecheck",
+    "ui:test:visual": "playwright test tests/ui --grep @visual",
+    "ui:test:a11y": "playwright test tests/ui --grep @a11y",
+    "ui:gate:regression": "pnpm ui:test:visual && pnpm ui:test:a11y",
+    "ui:gate": "pnpm ui:gate:static && pnpm ui:gate:regression",
     "test": "vitest run",
     "clean:build": "node scripts/clean-build.mjs",
     "clean:local": "node scripts/clean-local.mjs",
     "clean:git": "node scripts/clean-git.mjs",
     "clean:repo": "pnpm clean:local && pnpm clean:git",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "ui:test:visual:update": "playwright test tests/ui --grep @visual --update-snapshots"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -29,6 +38,9 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.0",
+    "@lhci/cli": "^0.15.1",
+    "@playwright/test": "^1.56.1",
     "@tauri-apps/cli": "^2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
@@ -36,10 +48,19 @@
     "@typescript-eslint/parser": "^8.26.0",
     "@vitejs/plugin-react": "^4.6.0",
     "eslint": "^8.57.1",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
+    "eslint-plugin-tailwindcss": "^3.18.2",
+    "globals": "^16.4.0",
+    "lighthouse": "^12.8.2",
+    "prettier": "^3.6.2",
+    "prettier-plugin-tailwindcss": "^0.7.1",
+    "stylelint": "^16.25.0",
+    "stylelint-config-standard": "^39.0.1",
     "typescript": "~5.8.3",
     "vite": "^7.0.4",
-    "vitest": "^3.0.7"
+    "vitest": "^3.0.7",
+    "web-vitals": "^5.1.0"
   }
 }

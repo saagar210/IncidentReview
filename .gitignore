@@ -23,3 +23,8 @@ src-tauri/gen/
 
 # Temporary scaffolding (not part of repo)
 _scaffold/
+
+# UI quality artifacts
+playwright-report/
+test-results/
+.lighthouseci/

@@ -1,5 +1,5 @@
 :root {
-  color-scheme: light;
+  color-scheme: dark;
   --bg: #0b0f17;
   --panel: rgba(255, 255, 255, 0.06);
   --text: rgba(255, 255, 255, 0.92);
@@ -91,15 +91,20 @@ body {
 .select,
 .textInput {
   border: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.18);
-  color: var(--text);
+  background: rgba(11, 15, 23, 0.92);
+  color: rgba(255, 255, 255, 0.96);
   padding: 10px 12px;
   border-radius: 12px;
   min-width: 240px;
 }
 
 .textInput::placeholder {
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.select option {
+  background: #0b0f17;
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .twoCol {
