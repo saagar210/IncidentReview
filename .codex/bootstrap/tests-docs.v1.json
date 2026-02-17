@@ -1,0 +1,11 @@
+{
+  "contract": "tests-docs-bootstrap-v1",
+  "adapter": "node-ts",
+  "branch": "codex/bootstrap-tests-docs-v1",
+  "generated_at": "2026-02-17T05:35:29.340Z",
+  "generated_by": "/Users/d/.codex/scripts/bootstrap/global_tests_docs_bootstrap.mjs",
+  "changed_files": [
+    ".codex/scripts/run_verify_commands.sh",
+    ".github/workflows/quality-gates.yml"
+  ]
+}
