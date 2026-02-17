@@ -6,7 +6,7 @@
 
 # Class: AppErrorException
 
-Defined in: [src/lib/tauri.ts:11](https://github.com/saagar210/IncidentReview/blob/17225dffced423acb649d740c08dbd0ee44b59c8/src/lib/tauri.ts#L11)
+Defined in: [src/lib/tauri.ts:11](https://github.com/saagar210/IncidentReview/blob/fa4457f78085812c15cd94931e9603044d270a42/src/lib/tauri.ts#L11)
 
 ## Extends
 
@@ -18,7 +18,7 @@ Defined in: [src/lib/tauri.ts:11](https://github.com/saagar210/IncidentReview/bl
 
 > **new AppErrorException**(`err`): `AppErrorException`
 
-Defined in: [src/lib/tauri.ts:16](https://github.com/saagar210/IncidentReview/blob/17225dffced423acb649d740c08dbd0ee44b59c8/src/lib/tauri.ts#L16)
+Defined in: [src/lib/tauri.ts:16](https://github.com/saagar210/IncidentReview/blob/fa4457f78085812c15cd94931e9603044d270a42/src/lib/tauri.ts#L16)
 
 #### Parameters
 
@@ -52,7 +52,7 @@ Defined in: node\_modules/.pnpm/typescript@5.8.3/node\_modules/typescript/lib/li
 
 > **code**: `string`
 
-Defined in: [src/lib/tauri.ts:12](https://github.com/saagar210/IncidentReview/blob/17225dffced423acb649d740c08dbd0ee44b59c8/src/lib/tauri.ts#L12)
+Defined in: [src/lib/tauri.ts:12](https://github.com/saagar210/IncidentReview/blob/fa4457f78085812c15cd94931e9603044d270a42/src/lib/tauri.ts#L12)
 
 ***
 
@@ -60,7 +60,7 @@ Defined in: [src/lib/tauri.ts:12](https://github.com/saagar210/IncidentReview/bl
 
 > `optional` **details**: `unknown`
 
-Defined in: [src/lib/tauri.ts:13](https://github.com/saagar210/IncidentReview/blob/17225dffced423acb649d740c08dbd0ee44b59c8/src/lib/tauri.ts#L13)
+Defined in: [src/lib/tauri.ts:13](https://github.com/saagar210/IncidentReview/blob/fa4457f78085812c15cd94931e9603044d270a42/src/lib/tauri.ts#L13)
 
 ***
 
@@ -92,7 +92,7 @@ Defined in: node\_modules/.pnpm/typescript@5.8.3/node\_modules/typescript/lib/li
 
 > **retryable**: `boolean`
 
-Defined in: [src/lib/tauri.ts:14](https://github.com/saagar210/IncidentReview/blob/17225dffced423acb649d740c08dbd0ee44b59c8/src/lib/tauri.ts#L14)
+Defined in: [src/lib/tauri.ts:14](https://github.com/saagar210/IncidentReview/blob/fa4457f78085812c15cd94931e9603044d270a42/src/lib/tauri.ts#L14)
 
 ***
 

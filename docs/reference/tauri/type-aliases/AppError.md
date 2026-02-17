@@ -8,7 +8,7 @@
 
 > **AppError** = `object`
 
-Defined in: [src/lib/tauri.ts:4](https://github.com/saagar210/IncidentReview/blob/17225dffced423acb649d740c08dbd0ee44b59c8/src/lib/tauri.ts#L4)
+Defined in: [src/lib/tauri.ts:4](https://github.com/saagar210/IncidentReview/blob/fa4457f78085812c15cd94931e9603044d270a42/src/lib/tauri.ts#L4)
 
 ## Properties
 
@@ -16,7 +16,7 @@ Defined in: [src/lib/tauri.ts:4](https://github.com/saagar210/IncidentReview/blo
 
 > **code**: `string`
 
-Defined in: [src/lib/tauri.ts:5](https://github.com/saagar210/IncidentReview/blob/17225dffced423acb649d740c08dbd0ee44b59c8/src/lib/tauri.ts#L5)
+Defined in: [src/lib/tauri.ts:5](https://github.com/saagar210/IncidentReview/blob/fa4457f78085812c15cd94931e9603044d270a42/src/lib/tauri.ts#L5)
 
 ***
 
@@ -24,7 +24,7 @@ Defined in: [src/lib/tauri.ts:5](https://github.com/saagar210/IncidentReview/blo
 
 > `optional` **details**: `unknown`
 
-Defined in: [src/lib/tauri.ts:7](https://github.com/saagar210/IncidentReview/blob/17225dffced423acb649d740c08dbd0ee44b59c8/src/lib/tauri.ts#L7)
+Defined in: [src/lib/tauri.ts:7](https://github.com/saagar210/IncidentReview/blob/fa4457f78085812c15cd94931e9603044d270a42/src/lib/tauri.ts#L7)
 
 ***
 
@@ -32,7 +32,7 @@ Defined in: [src/lib/tauri.ts:7](https://github.com/saagar210/IncidentReview/blo
 
 > **message**: `string`
 
-Defined in: [src/lib/tauri.ts:6](https://github.com/saagar210/IncidentReview/blob/17225dffced423acb649d740c08dbd0ee44b59c8/src/lib/tauri.ts#L6)
+Defined in: [src/lib/tauri.ts:6](https://github.com/saagar210/IncidentReview/blob/fa4457f78085812c15cd94931e9603044d270a42/src/lib/tauri.ts#L6)
 
 ***
 
@@ -40,4 +40,4 @@ Defined in: [src/lib/tauri.ts:6](https://github.com/saagar210/IncidentReview/blo
 
 > `optional` **retryable**: `boolean`
 
-Defined in: [src/lib/tauri.ts:8](https://github.com/saagar210/IncidentReview/blob/17225dffced423acb649d740c08dbd0ee44b59c8/src/lib/tauri.ts#L8)
+Defined in: [src/lib/tauri.ts:8](https://github.com/saagar210/IncidentReview/blob/fa4457f78085812c15cd94931e9603044d270a42/src/lib/tauri.ts#L8)
