@@ -24,9 +24,6 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile || pnpm install
 
@@ -62,12 +59,9 @@ jobs:
           python -m pip install --upgrade pip diff-cover
           diff-cover coverage/lcov.info --compare-branch=origin/main --fail-under=90
 
-      - name: Coverage PR report
+      - name: Coverage summary
         if: always()
-        uses: davelosert/vitest-coverage-report-action@v2
-        with:
-          json-summary-path: coverage/coverage-summary.json
-          json-final-path: coverage/coverage-final.json
+        run: node -e "const fs=require('fs');const p='coverage/coverage-summary.json';if(fs.existsSync(p)){const c=JSON.parse(fs.readFileSync(p,'utf8'));console.log('Coverage lines:',c.total?.lines?.pct);console.log('Coverage branches:',c.total?.branches?.pct);}else{console.log('coverage summary missing')}}"
 
       - name: Upload test artifacts on failure
         if: failure()
