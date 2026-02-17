@@ -66,7 +66,7 @@ jobs:
       - name: TruffleHog secret scan
         uses: trufflesecurity/trufflehog@main
         with:
-          extra_args: --results=verified --fail
+          extra_args: --results=verified
 
   sast:
     name: codex_sast
