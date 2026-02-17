@@ -1,0 +1,740 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "IncidentReview Command Contract",
+    "version": "1.0.0",
+    "description": "Generated command contract docs for Tauri RPC handlers."
+  },
+  "components": {
+    "schemas": {},
+    "parameters": {}
+  },
+  "paths": {
+    "/rpc/init_db": {
+      "post": {
+        "description": "Initialize or open a workspace database through the Tauri command layer.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "dbPath": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Workspace initialized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "db_path": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "db_path"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "AppError response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/load_dashboard_v2": {
+      "post": {
+        "description": "Load deterministic dashboard analytics payload.",
+        "responses": {
+          "200": {
+            "description": "Dashboard payload V2.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "integer"
+                    },
+                    "incident_count": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "severity_counts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "severity": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "incident_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "required": [
+                          "severity",
+                          "count",
+                          "incident_ids"
+                        ]
+                      }
+                    },
+                    "incidents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "external_id": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "severity": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "detection_source": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "vendor": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "service": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "it_awareness_lag_seconds": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "time_to_mitigation_seconds": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "mttr_seconds": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "warning_count": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "external_id",
+                          "title",
+                          "severity",
+                          "detection_source",
+                          "vendor",
+                          "service",
+                          "it_awareness_lag_seconds",
+                          "time_to_mitigation_seconds",
+                          "mttr_seconds",
+                          "warning_count"
+                        ]
+                      }
+                    },
+                    "detection_story": {
+                      "type": "object",
+                      "properties": {
+                        "detection_source_mix": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "incident_ids": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "label",
+                              "count",
+                              "incident_ids"
+                            ]
+                          }
+                        },
+                        "it_awareness_lag_buckets": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "incident_ids": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "label",
+                              "count",
+                              "incident_ids"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "detection_source_mix",
+                        "it_awareness_lag_buckets"
+                      ]
+                    },
+                    "vendor_service_story": {
+                      "type": "object",
+                      "properties": {
+                        "top_vendors_by_count": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "incident_ids": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "label",
+                              "count",
+                              "incident_ids"
+                            ]
+                          }
+                        },
+                        "top_services_by_count": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "incident_ids": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "label",
+                              "count",
+                              "incident_ids"
+                            ]
+                          }
+                        },
+                        "top_vendors_by_pain": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "pain_sum": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "pain_known_count": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "incident_ids": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "label",
+                              "count",
+                              "pain_sum",
+                              "pain_known_count",
+                              "incident_ids"
+                            ]
+                          }
+                        },
+                        "top_services_by_pain": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "pain_sum": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "pain_known_count": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "incident_ids": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "label",
+                              "count",
+                              "pain_sum",
+                              "pain_known_count",
+                              "incident_ids"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "top_vendors_by_count",
+                        "top_services_by_count",
+                        "top_vendors_by_pain",
+                        "top_services_by_pain"
+                      ]
+                    },
+                    "response_story": {
+                      "type": "object",
+                      "properties": {
+                        "time_to_mitigation_buckets": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "incident_ids": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "label",
+                              "count",
+                              "incident_ids"
+                            ]
+                          }
+                        },
+                        "time_to_resolve_buckets": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "incident_ids": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "label",
+                              "count",
+                              "incident_ids"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "time_to_mitigation_buckets",
+                        "time_to_resolve_buckets"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "version",
+                    "incident_count",
+                    "severity_counts",
+                    "incidents",
+                    "detection_story",
+                    "vendor_service_story",
+                    "response_story"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "AppError response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/run_validators": {
+      "post": {
+        "description": "Run validator engine and return anomaly report.",
+        "responses": {
+          "200": {
+            "description": "Validation report.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer"
+                      },
+                      "external_id": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "warnings": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "type": "string"
+                            },
+                            "message": {
+                              "type": "string"
+                            },
+                            "details": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "code",
+                            "message"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "external_id",
+                      "title",
+                      "warnings"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "AppError response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/check_workspace_migration_status": {
+      "post": {
+        "description": "Return migration drift status for selected workspace DB.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "dbPath": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "dbPath"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Workspace migration status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dbPath": {
+                      "type": "string"
+                    },
+                    "latestMigration": {
+                      "type": "string"
+                    },
+                    "appliedMigrations": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "pendingMigrations": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "dbPath",
+                    "latestMigration",
+                    "appliedMigrations",
+                    "pendingMigrations"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "AppError response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}

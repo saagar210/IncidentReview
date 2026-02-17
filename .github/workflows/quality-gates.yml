@@ -1,0 +1,80 @@
+name: quality-gates
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.2
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile || pnpm install
+
+      - name: Policy: tests + docs required
+        run: pnpm policy:require-tests-docs
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit + integration + contracts + coverage
+        run: pnpm test:coverage && pnpm test:integration && pnpm test:contracts
+
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: E2E smoke
+        run: pnpm test:e2e:smoke
+
+      - name: Docs drift check
+        run: pnpm docs:check
+
+      - name: Rust core tests
+        run: cargo test -p qir_core --all-features
+
+      - name: Rust AI tests
+        run: cargo test -p qir_ai --all-features
+
+      - name: Diff coverage
+        run: |
+          python -m pip install --upgrade pip diff-cover
+          diff-cover coverage/lcov.info --compare-branch=origin/main --fail-under=90
+
+      - name: Coverage PR report
+        if: always()
+        uses: davelosert/vitest-coverage-report-action@v2
+        with:
+          json-summary-path: coverage/coverage-summary.json
+          json-final-path: coverage/coverage-final.json
+
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-gate-artifacts
+          path: |
+            playwright-report/
+            test-results/
+            coverage/

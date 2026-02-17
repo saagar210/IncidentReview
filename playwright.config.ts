@@ -1,10 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
-  testDir: "./tests/ui",
+  testDir: "./tests",
   fullyParallel: false,
   retries: process.env.CI ? 2 : 0,
-  reporter: [["html"], ["github"]],
+  workers: process.env.CI ? 2 : undefined,
+  reporter: [["html", { open: "never" }], ["github"]],
   snapshotPathTemplate: "{testDir}/{testFilePath}-snapshots/{arg}-{projectName}{ext}",
   webServer: {
     command: process.env.PLAYWRIGHT_WEB_SERVER_CMD ?? "pnpm dev --host 127.0.0.1 --port 4101",
@@ -16,7 +17,7 @@ export default defineConfig({
     baseURL: process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:4101",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
-    video: "off",
+    video: "retain-on-failure",
     timezoneId: "UTC",
     locale: "en-US",
     colorScheme: "light",

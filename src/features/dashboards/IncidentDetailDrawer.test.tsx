@@ -1,22 +1,24 @@
-import { describe, expect, it } from "vitest";
-import { renderToString } from "react-dom/server";
+// @vitest-environment jsdom
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import { IncidentDetailDrawer } from "./IncidentDetailDrawer";
 
 describe("IncidentDetailDrawer", () => {
   it("renders nothing when closed", () => {
-    const html = renderToString(
+    const { container } = render(
       <IncidentDetailDrawer open={false} loading={false} detail={null} onClose={() => {}} />
     );
-    expect(html).toBe("");
+    expect(container).toBeEmptyDOMElement();
   });
 
-  it("renders details when open", () => {
-    const html = renderToString(
+  it("renders detail state and supports close interactions", () => {
+    const onClose = vi.fn();
+    render(
       <IncidentDetailDrawer
         open={true}
         loading={false}
-        onClose={() => {}}
+        onClose={onClose}
         detail={{
           incident: {
             id: 1,
@@ -44,20 +46,46 @@ describe("IncidentDetailDrawer", () => {
             resolve_ts_raw: null,
           },
           metrics: {
-            mttd_seconds: null,
+            mttd_seconds: 120,
             it_awareness_lag_seconds: null,
-            mtta_seconds: null,
+            mtta_seconds: 300,
             time_to_mitigation_seconds: null,
-            mttr_seconds: null,
+            mttr_seconds: 900,
           },
           warnings: [],
-          artifacts: [],
-          timeline_events: [],
+          artifacts: [{ id: 10, incident_id: 1, kind: "log", sha256: "abc123def456", filename: "events.log", mime_type: "text/plain", text: null, created_at: "2026-02-17T00:00:00Z" }],
+          timeline_events: [
+            {
+              id: 77,
+              incident_id: 1,
+              source: "slack",
+              ts: "2026-02-17T00:01:00Z",
+              author: "bot",
+              kind: "message",
+              text: "[REDACTED]",
+              raw_json: "{\"text_redacted\":true}",
+              created_at: "2026-02-17T00:01:00Z",
+            },
+          ],
         }}
       />
     );
-    expect(html).toContain("Incident detail");
-    expect(html).toContain("Computed metrics");
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText("Computed metrics (deterministic)")).toBeInTheDocument();
+    expect(screen.getByText("No warnings.")).toBeInTheDocument();
+    expect(screen.getByText("(redacted)")).toBeInTheDocument();
+    expect(screen.getByText(/events.log/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close incident detail drawer" }));
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it("renders loading state when detail is pending", () => {
+    render(<IncidentDetailDrawer open={true} loading={true} detail={null} onClose={() => {}} />);
+
+    expect(screen.getByText("Loading incident detail...")).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 });
-

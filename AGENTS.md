@@ -185,10 +185,16 @@ Error code families:
 After scaffolding, ensure these are present and used:
 ```bash
 pnpm lint
-pnpm test
-pnpm tauri build
-cargo test -p qir_core
-cargo test -p qir_ai
+pnpm typecheck
+pnpm test:coverage
+pnpm test:integration
+pnpm test:contracts
+pnpm test:e2e:smoke
+pnpm docs:generate
+pnpm docs:check
+pnpm policy:require-tests-docs
+cargo test -p qir_core --all-features
+cargo test -p qir_ai --all-features
 ```
 
 Do not add additional commands without adding them to `package.json` scripts and documenting them.
@@ -212,13 +218,18 @@ Do not add additional commands without adding them to `package.json` scripts and
 ## Codex Reliability Contract
 
 ### Canonical Verification Commands (Source of Truth)
-Source: `.codex/verify.commands` (derived from `.github/workflows/ci.yml`)
-- lint: `pnpm lint`
-- format-check: `N/A (no standalone formatter check defined in CI/docs)`
-- typecheck: `N/A (covered indirectly by build/toolchain checks)`
-- unit-test: `pnpm test`; `cargo test -p qir_core --all-features`; `cargo test -p qir_ai --all-features`
-- integration-test: `N/A (no standalone integration command defined in CI/docs)`
-- build: `pnpm tauri build --ci`
+Source: `.codex/verify.commands`
+- `pnpm lint`
+- `pnpm typecheck`
+- `pnpm test:coverage`
+- `pnpm test:integration`
+- `pnpm test:contracts`
+- `pnpm test:e2e:smoke`
+- `pnpm docs:generate`
+- `pnpm docs:check`
+- `pnpm policy:require-tests-docs`
+- `cargo test -p qir_core --all-features`
+- `cargo test -p qir_ai --all-features`
 
 ### Definition of Done
 - All commands in `.codex/verify.commands` pass via `.codex/scripts/run_verify_commands.sh`.
@@ -228,6 +239,7 @@ Source: `.codex/verify.commands` (derived from `.github/workflows/ci.yml`)
 
 ### Agent Contract
 - Reviewer agent: read-only and emits only `ReviewFindingV1` findings.
+- QA reviewer mode must use `/Users/d/Projects/IncidentReview/.codex/prompts/test-critic.md` for test/doc depth passes.
 - Fixer agent: applies accepted findings in severity order and reports exact file patches + verification.
 - Final verifier: re-runs `.codex/scripts/run_verify_commands.sh` and summarizes `GateReportV1`.
 
@@ -241,3 +253,18 @@ Source: `.codex/verify.commands` (derived from `.github/workflows/ci.yml`)
    - `pnpm ui:gate:regression`
    - Lighthouse CI workflow (`.github/workflows/lighthouse.yml`)
 5) Done-state is blocked if any required UI gate is `fail` or `not-run`.
+
+## Definition of Done: Tests + Docs (Blocking)
+
+- Any production code change must include meaningful test updates in the same PR.
+- Meaningful tests must include at least:
+  - one primary behavior assertion
+  - two non-happy-path assertions (edge, boundary, invalid input, or failure mode)
+- Trivial assertions are forbidden (`expect(true).toBe(true)`, snapshot-only without semantic assertions, render-only smoke tests without behavior checks).
+- Mock only external boundaries (network, clock, randomness, third-party SDKs). Do not mock the unit under test.
+- UI changes must cover state matrix: loading, empty, error, success, disabled, focus-visible.
+- Tauri command contract changes must update command contract docs and examples in docs.
+- Architecture-impacting changes must include an ADR in `/docs/adr/`.
+- Required checks are blocking when `fail` or `not-run`: lint, typecheck, tests, coverage, diff coverage, docs check.
+- Existing reviewer -> fixer -> reviewer loop is required before merge.
+- Use `.codex/skills/testing-foundation/SKILL.md` and `.codex/skills/documentation-standard/SKILL.md` for feature work by default.

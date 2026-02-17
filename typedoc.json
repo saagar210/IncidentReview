@@ -1,0 +1,8 @@
+{
+  "entryPoints": ["src/lib/schemas.ts", "src/lib/tauri.ts"],
+  "out": "docs/reference",
+  "plugin": ["typedoc-plugin-markdown"],
+  "readme": "none",
+  "excludePrivate": true,
+  "excludeInternal": true
+}

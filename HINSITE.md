@@ -2620,3 +2620,137 @@ Note: `pnpm approve-builds` was needed once to allow `esbuild` install scripts (
 6) Next steps
 - Optional: adopt `pnpm dev:lean` as the default daily run command.
 - Optional: run `pnpm clean:local` when you want a full cleanup including `node_modules`.
+
+---
+
+## 2026-02-17 - Tests + living docs by default enforcement rollout
+
+1) Done: what changed + why
+- Implemented a full tests/docs-by-default enforcement layer for IncidentReview so PM-style feature prompts inherit quality gates automatically.
+- Added blocking Definition-of-Done rules in `AGENTS.md` covering meaningful tests, docs updates, and reviewer->fixer->reviewer loop.
+- Expanded canonical verification to include typecheck, coverage, integration tests, contract tests, e2e smoke, docs generation/drift checks, and policy checks.
+- Added test scaffolds and deterministic fixture setup (`tests/setup`, `tests/factories`, `tests/integration`, `tests/contracts`, `tests/e2e/smoke`) to prevent render-only test anti-patterns.
+- Added docs automation pipeline (`scripts/docs/generate-openapi.ts`, `typedoc.json`, `scripts/docs/sync-readme-env.mjs`, `scripts/docs/check-doc-drift.mjs`) plus generated artifacts in `openapi/` and `docs/reference/`.
+- Added CI enforcement workflows for quality gates, release automation, and nightly mutation checks.
+- Added QA critic prompt and two new Codex skills (`testing-foundation`, `documentation-standard`) both repo-local and global.
+- Updated global Codex config (`/Users/d/.codex/config.toml`) with trusted repo path plus `qa`/`docs` profiles for deterministic execution.
+
+2) Files changed
+- `/Users/d/Projects/IncidentReview/AGENTS.md`
+- `/Users/d/Projects/IncidentReview/.codex/verify.commands`
+- `/Users/d/Projects/IncidentReview/.codex/commands.md`
+- `/Users/d/Projects/IncidentReview/package.json`
+- `/Users/d/Projects/IncidentReview/pnpm-lock.yaml`
+- `/Users/d/Projects/IncidentReview/vitest.config.ts`
+- `/Users/d/Projects/IncidentReview/playwright.config.ts`
+- `/Users/d/Projects/IncidentReview/.env.example`
+- `/Users/d/Projects/IncidentReview/typedoc.json`
+- `/Users/d/Projects/IncidentReview/README.md`
+- `/Users/d/Projects/IncidentReview/stryker.conf.json`
+- `/Users/d/Projects/IncidentReview/tests/setup/vitest.setup.ts`
+- `/Users/d/Projects/IncidentReview/tests/factories/user.factory.ts`
+- `/Users/d/Projects/IncidentReview/tests/integration/tauri-error.integration.test.ts`
+- `/Users/d/Projects/IncidentReview/tests/contracts/dashboard-payload.contract.test.ts`
+- `/Users/d/Projects/IncidentReview/tests/e2e/smoke/navigation.smoke.spec.ts`
+- `/Users/d/Projects/IncidentReview/scripts/docs/generate-openapi.ts`
+- `/Users/d/Projects/IncidentReview/scripts/docs/sync-readme-env.mjs`
+- `/Users/d/Projects/IncidentReview/scripts/docs/check-doc-drift.mjs`
+- `/Users/d/Projects/IncidentReview/scripts/ci/require-tests-and-docs.mjs`
+- `/Users/d/Projects/IncidentReview/docs/adr/0000-template.md`
+- `/Users/d/Projects/IncidentReview/docs/architecture/overview.md`
+- `/Users/d/Projects/IncidentReview/docs/reference/README.md`
+- `/Users/d/Projects/IncidentReview/docs/reference/schemas/README.md`
+- `/Users/d/Projects/IncidentReview/docs/reference/tauri/README.md`
+- `/Users/d/Projects/IncidentReview/openapi/openapi.generated.json`
+- `/Users/d/Projects/IncidentReview/.codex/prompts/test-critic.md`
+- `/Users/d/Projects/IncidentReview/.codex/skills/testing-foundation/SKILL.md`
+- `/Users/d/Projects/IncidentReview/.codex/skills/documentation-standard/SKILL.md`
+- `/Users/d/Projects/IncidentReview/.github/workflows/quality-gates.yml`
+- `/Users/d/Projects/IncidentReview/.github/workflows/release-please.yml`
+- `/Users/d/Projects/IncidentReview/.github/workflows/mutation-nightly.yml`
+- `/Users/d/.codex/config.toml`
+- `/Users/d/.codex/skills/testing-foundation/SKILL.md`
+- `/Users/d/.codex/skills/documentation-standard/SKILL.md`
+- `/Users/d/Projects/IncidentReview/HINSITE.md`
+
+3) Verification: commands run + results
+- `pnpm install` (source: `/Users/d/Projects/IncidentReview/README.md`) -> OK
+- `pnpm lint` (source: `/Users/d/Projects/IncidentReview/package.json`) -> OK
+- `pnpm typecheck` (source: `/Users/d/Projects/IncidentReview/package.json`) -> OK
+- `pnpm test:coverage` (source: `/Users/d/Projects/IncidentReview/package.json`) -> OK
+- `pnpm test:integration` (source: `/Users/d/Projects/IncidentReview/package.json`) -> OK
+- `pnpm test:contracts` (source: `/Users/d/Projects/IncidentReview/package.json`) -> OK
+- `pnpm test:e2e:smoke` (source: `/Users/d/Projects/IncidentReview/package.json`) -> OK
+- `pnpm docs:generate` (source: `/Users/d/Projects/IncidentReview/package.json`) -> OK
+- `pnpm docs:check` (source: `/Users/d/Projects/IncidentReview/package.json`) -> OK
+- `pnpm policy:require-tests-docs` (source: `/Users/d/Projects/IncidentReview/package.json`) -> OK
+- `bash ./.codex/scripts/run_verify_commands.sh` (source: `/Users/d/Projects/IncidentReview/.codex/scripts/run_verify_commands.sh`) -> OK
+- `cargo test -p qir_core --all-features` (source: `/Users/d/Projects/IncidentReview/.codex/verify.commands`) -> OK
+- `cargo test -p qir_ai --all-features` (source: `/Users/d/Projects/IncidentReview/.codex/verify.commands`) -> OK
+
+4) Risks / follow-ups
+- Coverage threshold is currently set to a pragmatic baseline (20/30) to avoid blocking legacy coverage debt; strictness should continue through diff coverage (`--fail-under=90`) in CI.
+- `release-please` workflow assumes conventional commit discipline; repository policy should enforce commit format for reliable changelog output.
+- New policy script enforces docs/tests updates from file heuristics; monitor false positives and tune regexes if needed.
+
+5) Status: current phase + complete / in progress / blocked
+- Tests + living docs rollout for IncidentReview: complete.
+- Canonical verification gate: complete and green.
+
+6) Next steps
+- Optional: raise global coverage thresholds in `vitest.config.ts` incrementally once baseline tests improve.
+- Optional: configure branch protection to require `quality-gates` and existing security workflows before merge.
+
+---
+
+## 2026-02-17 - Completion pass for "do all" (branch protection + automation + shallow test hardening)
+
+1) Done: what changed + why
+- Completed remaining rollout items from the tests/docs-by-default plan, including GitHub enforcement and automation cleanup.
+- Upgraded remaining shallow `renderToString` tests to behavior-first Testing Library coverage for:
+  - `AboutSection`
+  - `AiSection`
+  - `SanitizedImportSection`
+  - `IncidentDetailDrawer`
+- Aligned `AGENTS.md` verification contracts to the actual `.codex/verify.commands` source of truth and added explicit QA reviewer prompt routing to `.codex/prompts/test-critic.md`.
+- Updated branch protection required status checks on `main` to include `quality` alongside existing Codex security checks.
+- Normalized Codex automations under `/Users/d/.codex/automations`: kept canonical `docs-drift-patrol`, `qa-depth-sweep`, and `flake-mutation-watch` active, and paused duplicate schedules (`docs-drift-patrol-2`, `qa-depth-sweep-2`).
+
+2) Files changed
+- `/Users/d/Projects/IncidentReview/src/features/about/AboutSection.test.tsx`
+- `/Users/d/Projects/IncidentReview/src/features/ai/AiSection.test.tsx`
+- `/Users/d/Projects/IncidentReview/src/features/import_sanitized/SanitizedImportSection.test.tsx`
+- `/Users/d/Projects/IncidentReview/src/features/dashboards/IncidentDetailDrawer.test.tsx`
+- `/Users/d/Projects/IncidentReview/src/features/backup_restore/BackupRestoreSection.test.tsx`
+- `/Users/d/Projects/IncidentReview/src/features/validation/ValidationSection.test.tsx`
+- `/Users/d/Projects/IncidentReview/src/features/report/ReportSection.test.tsx`
+- `/Users/d/Projects/IncidentReview/src/smoke.test.tsx`
+- `/Users/d/Projects/IncidentReview/AGENTS.md`
+- `/Users/d/Projects/IncidentReview/.codex/commands.md`
+- `/Users/d/Projects/IncidentReview/tsconfig.json`
+- `/Users/d/Projects/IncidentReview/package.json`
+- `/Users/d/Projects/IncidentReview/pnpm-lock.yaml`
+- `/Users/d/.codex/automations/docs-drift-patrol/automation.toml`
+- `/Users/d/.codex/automations/docs-drift-patrol-2/automation.toml`
+- `/Users/d/.codex/automations/qa-depth-sweep/automation.toml`
+- `/Users/d/.codex/automations/qa-depth-sweep-2/automation.toml`
+- `/Users/d/.codex/automations/flake-mutation-watch/automation.toml`
+- `/Users/d/Projects/IncidentReview/HINSITE.md`
+
+3) Verification: commands run + results
+- `pnpm test` (source: `/Users/d/Projects/IncidentReview/package.json`) -> OK
+- `bash ./.codex/scripts/run_verify_commands.sh` (source: `/Users/d/Projects/IncidentReview/.codex/scripts/run_verify_commands.sh`) -> OK
+- `gh api repos/saagar210/IncidentReview/branches/main/protection/required_status_checks` (source: GitHub REST API via `gh`) -> confirms `quality` required with strict mode.
+
+4) Risks / follow-ups
+- Coverage remains below high global thresholds due legacy untested surfaces; diff coverage remains the primary enforcement guard.
+- `quality` is now required on `main`; ensure PRs trigger `.github/workflows/quality-gates.yml` consistently for all relevant events.
+- Automation duplicate entries were paused (not deleted) to preserve history and avoid accidental schedule loss.
+
+5) Status: current phase + complete / in progress / blocked
+- Tests + living docs rollout: complete.
+- Remaining implementation actions from the plan: complete.
+
+6) Next steps
+- Optional: ratchet global coverage thresholds incrementally once legacy modules gain tests.
+- Optional: wire reviewer/fixer launcher command aliases if you want one-command execution of the QA critic loop.

@@ -36,6 +36,11 @@ jobs:
           if grep -q "cargo audit" .codex/verify.commands; then
             cargo install cargo-audit --locked
           fi
+      - name: Install Playwright browser when required
+        run: |
+          if grep -q "test:e2e" .codex/verify.commands; then
+            pnpm exec playwright install chromium
+          fi
       - name: Run canonical repo gates
         run: bash ./.codex/scripts/run_verify_commands.sh
 

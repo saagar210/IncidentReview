@@ -229,3 +229,11 @@ The app must provide:
 ## License
 
 TBD.
+
+## Environment Variables
+
+<!-- AUTO-GENERATED:ENV START -->
+| Variable | Required | Description |
+|---|---|---|
+| `INCIDENTREVIEW_OLLAMA_BASE_URL` | optional | TODO |
+<!-- AUTO-GENERATED:ENV END -->
