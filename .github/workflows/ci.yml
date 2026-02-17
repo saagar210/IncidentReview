@@ -60,3 +60,21 @@ jobs:
       - run: pnpm install
       - run: pnpm tauri build --ci
         timeout-minutes: 60
+
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 10.29.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+      - uses: dtolnay/rust-toolchain@stable
+      - run: pnpm install --frozen-lockfile || pnpm install
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: bash ./.codex/scripts/run_verify_commands.sh

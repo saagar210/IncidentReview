@@ -1,4 +1,4 @@
-# Source: .github/workflows/quality-gates.yml and AGENTS.md
+# Source: .github/workflows/ci.yml, .github/workflows/codex-quality-security.yml, and AGENTS.md
 pnpm lint
 pnpm typecheck
 pnpm test:coverage
